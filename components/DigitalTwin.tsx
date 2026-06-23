@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Check } from "lucide-react";
 import { digitalTwin } from "@/lib/data";
@@ -9,6 +9,13 @@ import AnimatedText from "./ui/AnimatedText";
 
 export default function DigitalTwin() {
   const [activeIdx, setActiveIdx] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveIdx((prev) => (prev + 1) % digitalTwin.images.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <section className="relative py-24 md:py-32 bg-ink-900 text-white overflow-hidden">

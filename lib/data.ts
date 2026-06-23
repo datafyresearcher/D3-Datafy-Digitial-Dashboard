@@ -132,9 +132,10 @@ export const digitalTwin = {
     { icon: Layers, text: "Inspect infrastructure via digital twin" },
   ],
   images: [
-    "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1200&q=80",
+    "/dashboard-1.png",
+    "/dashboard-2.png",
+    "/dashboard-3.png",
+    "/dashboard-4.png",
   ],
 };
 
