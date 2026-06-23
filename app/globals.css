@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #0a0f0d;
+}
+
+* {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  overflow-x: hidden;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .gradient-text {
+    @apply bg-gradient-to-r from-brand-500 via-emerald-400 to-teal-400 bg-clip-text text-transparent;
+  }
+  .glass {
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+  .glass-dark {
+    background: rgba(10, 15, 13, 0.55);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+  .grid-bg {
+    background-image:
+      linear-gradient(to right, rgba(16, 185, 129, 0.08) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(16, 185, 129, 0.08) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+  .glow {
+    box-shadow: 0 0 40px -10px rgba(16, 185, 129, 0.45);
+  }
+  .card-hover {
+    @apply transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-brand-500/20;
+  }
+  .shimmer-bg {
+    position: relative;
+    overflow: hidden;
+  }
+  .shimmer-bg::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.25),
+      transparent
+    );
+    animation: shimmer 2.5s infinite;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0f0d;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, #10b981, #047857);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #34d399;
+}
+
+::selection {
+  background: #10b981;
+  color: #fff;
+}
