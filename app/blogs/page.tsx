@@ -3,46 +3,12 @@ import { ArrowRight, Calendar, Clock, User } from "lucide-react";
 import Link from "next/link";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import AnimatedText from "@/components/ui/AnimatedText";
+import { blogPosts } from "@/lib/data";
 
 export const metadata: Metadata = {
   title: "Blogs | Datafy Associate",
   description: "Insights, news, and expertise on solar energy, drone technology, and geospatial mapping.",
 };
-
-const posts = [
-  {
-    title: "The Future of Solar Asset Management: AI & Drones",
-    excerpt: "How machine learning is revolutionizing the way we maintain large-scale solar installations.",
-    date: "Jun 20, 2026",
-    readTime: "5 min read",
-    image: "https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=800&q=80",
-    author: "Expert Team",
-  },
-  {
-    title: "Drone Thermography: Identifying the Invisible",
-    excerpt: "A deep dive into how thermal imaging uncovers critical hotspots and electrical faults.",
-    date: "Jun 15, 2026",
-    readTime: "7 min read",
-    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80",
-    author: "Engineering Dept",
-  },
-  {
-    title: "Why Accurate Topographical Data Matters",
-    excerpt: "Understanding the critical role of terrain modeling in large-scale construction and solar projects.",
-    date: "Jun 10, 2026",
-    readTime: "6 min read",
-    image: "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80",
-    author: "Geospatial Team",
-  },
-  {
-    title: "Maximizing ROI through Predictive Maintenance",
-    excerpt: "Shifting from reactive to proactive maintenance using real-time IoT and drone data.",
-    date: "Jun 05, 2026",
-    readTime: "8 min read",
-    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80",
-    author: "Data Analyst",
-  },
-];
 
 export default function BlogsPage() {
   return (
@@ -67,9 +33,9 @@ export default function BlogsPage() {
       <section className="py-24 bg-white">
         <div className="mx-auto max-w-7xl px-6">
           <div className="grid md:grid-cols-2 lg:grid-cols-2 gap-10">
-            {posts.map((post, i) => (
-              <AnimatedSection key={i} delay={i * 0.1} direction="up">
-                <Link href="#" className="group block">
+            {blogPosts.map((post, i) => (
+              <AnimatedSection key={post.slug} delay={i * 0.1} direction="up">
+                <Link href={`/blogs/${post.slug}`} className="group block">
                   <div className="flex flex-col md:flex-row gap-8 p-6 rounded-3xl border border-black/5 hover:shadow-2xl hover:shadow-black/5 transition-all">
                     <div className="relative w-full md:w-1/3 aspect-[4/3] md:aspect-square overflow-hidden rounded-2xl">
                       <img

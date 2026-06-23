@@ -1,7 +1,19 @@
 "use client";
 
 import Marquee from "./ui/Marquee";
-import { partners } from "@/lib/data";
+
+const partnerImages = [
+  { src: "/partners/ENERTECH.png", alt: "EnerTech" },
+  { src: "/partners/Nestle-logo.png", alt: "Nestlé" },
+  { src: "/partners/Quaid E Azam Solar Private Limited.jpg", alt: "Quaid-e-Azam Solar" },
+  { src: "/partners/Carrefour.png", alt: "Carrefour" },
+  { src: "/partners/Sapphire.png", alt: "Sapphire" },
+  { src: "/partners/Pepsi.png", alt: "Pepsi" },
+  { src: "/partners/Servis_logo.png", alt: "Servis" },
+  { src: "/partners/ALHussain-logo.png", alt: "Al Hussain" },
+  { src: "/partners/Fatima Group.jpg", alt: "Fatima Group" },
+  { src: "/partners/insights.png", alt: "Insights" },
+];
 
 export default function Partners() {
   return (
@@ -12,15 +24,17 @@ export default function Partners() {
         </span>
       </div>
       <div className="flex overflow-hidden">
-        <Marquee speed={40}>
-          {partners.map((p) => (
+        <Marquee speed={40} reverse>
+          {partnerImages.map((p) => (
             <div
-              key={p}
+              key={p.alt}
               className="mx-8 flex items-center justify-center grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all cursor-default"
             >
-              <span className="font-display font-bold text-2xl text-ink-900 whitespace-nowrap">
-                {p}
-              </span>
+              <img
+                src={p.src}
+                alt={p.alt}
+                className="h-12 w-auto object-contain"
+              />
             </div>
           ))}
         </Marquee>

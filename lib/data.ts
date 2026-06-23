@@ -222,3 +222,127 @@ export const stats = [
   { value: 24, suffix: "/7", label: "NOC Monitoring" },
   { value: 2, suffix: "x", label: "Faster Inspections" },
 ];
+
+export const blogPosts = [
+  {
+    slug: "future-of-solar-asset-management",
+    title: "The Future of Solar Asset Management: AI & Drones",
+    excerpt: "How machine learning is revolutionizing the way we maintain large-scale solar installations.",
+    date: "Jun 20, 2026",
+    readTime: "5 min read",
+    image: "https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=800&q=80",
+    author: "Expert Team",
+    content: `The solar energy industry is undergoing a profound transformation, driven by the convergence of artificial intelligence (AI) and drone technology. As solar installations grow larger and more distributed, traditional manual inspection and maintenance methods are no longer sufficient.
+
+## The Rise of AI-Powered Inspections
+
+AI algorithms can analyze thousands of solar panels in minutes, detecting anomalies that would take human inspectors weeks to identify. Thermal imaging drones capture high-resolution data, which AI models process to pinpoint hotspots, bypass diode failures, and cell cracks with remarkable accuracy.
+
+### Key Benefits
+
+- **Speed**: What once took months now takes days
+- **Accuracy**: AI detects issues invisible to the naked eye
+- **Cost Savings**: Reduced labor and downtime
+- **Predictive Maintenance**: Early detection prevents catastrophic failures
+
+## Real-World Applications
+
+At Datafy Associate, we've deployed our AI-powered drone inspection system across multiple solar farms, achieving a 99% accuracy rate in fault detection. Our clients have reported a 40% reduction in unplanned downtime and significant improvements in energy yield.
+
+## The Future
+
+As AI models become more sophisticated and drone technology advances, we expect to see fully autonomous inspection systems that can operate 24/7, providing real-time insights into solar asset health. The integration with digital twin platforms will enable operators to simulate and optimize performance like never before.`,
+  },
+  {
+    slug: "drone-thermography-identifying-the-invisible",
+    title: "Drone Thermography: Identifying the Invisible",
+    excerpt: "A deep dive into how thermal imaging uncovers critical hotspots and electrical faults.",
+    date: "Jun 15, 2026",
+    readTime: "7 min read",
+    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80",
+    author: "Engineering Dept",
+    content: `Thermography, or thermal imaging, has become an indispensable tool in solar asset management. By capturing the infrared radiation emitted by solar panels, drone-mounted thermal cameras can reveal temperature anomalies that indicate underlying issues.
+
+## How Thermal Imaging Works
+
+Solar panels naturally heat up during operation, but defective cells or connections often exhibit abnormal temperature patterns. Thermal cameras detect these patterns, producing detailed thermograms that trained analysts can interpret.
+
+### Common Faults Detected
+
+- **Hotspots**: Localized overheating due to cell damage or shading
+- **Bypass Diode Failures**: Components that fail to redirect current around damaged cells
+- **String Imbalances**: Uneven current distribution across panel strings
+- **Connection Issues**: Loose or corroded electrical connections
+
+## The Datafy Approach
+
+Our drone thermography service combines high-resolution thermal cameras with AI-powered analysis software. Each inspection generates thousands of data points, which are processed and mapped to specific GPS coordinates for precise remediation.
+
+## Case Study
+
+In a recent inspection of a 50MW solar farm, our thermal survey identified 127 panels with critical hotspots that were not visible during visual inspection. Prompt replacement of these panels prevented an estimated 15% loss in annual energy production.`,
+  },
+  {
+    slug: "why-accurate-topographical-data-matters",
+    title: "Why Accurate Topographical Data Matters",
+    excerpt: "Understanding the critical role of terrain modeling in large-scale construction and solar projects.",
+    date: "Jun 10, 2026",
+    readTime: "6 min read",
+    image: "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80",
+    author: "Geospatial Team",
+    content: `Accurate topographical data is the foundation of successful large-scale projects. Whether you're planning a solar farm, a construction site, or an infrastructure development, understanding the terrain is critical.
+
+## Why Topography Matters
+
+Topographical mapping provides essential information about elevation, slope, drainage patterns, and vegetation. This data influences everything from panel layout optimization to foundation design and stormwater management.
+
+### Applications in Solar Projects
+
+- **Site Selection**: Identifying optimal locations based on solar exposure and terrain
+- **Panel Layout**: Optimizing array orientation for maximum energy capture
+- **Drainage Planning**: Preventing water damage and erosion
+- **Access Roads**: Planning efficient construction and maintenance routes
+
+## Drone-Based Surveying
+
+Traditional ground-based surveys are time-consuming and expensive. Drone-based photogrammetry and LiDAR surveys can capture millions of data points in a single flight, producing highly accurate digital elevation models (DEMs).
+
+## Accuracy Matters
+
+With our drone surveying services, we achieve sub-centimeter accuracy in topographical mapping. This level of precision ensures that your project starts with reliable data, reducing costly errors during construction and operation.`,
+  },
+  {
+    slug: "maximizing-roi-predictive-maintenance",
+    title: "Maximizing ROI through Predictive Maintenance",
+    excerpt: "Shifting from reactive to proactive maintenance using real-time IoT and drone data.",
+    date: "Jun 05, 2026",
+    readTime: "8 min read",
+    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80",
+    author: "Data Analyst",
+    content: `Predictive maintenance is revolutionizing the solar industry by shifting the paradigm from reactive repairs to proactive asset management. By leveraging real-time data from IoT sensors and drone inspections, operators can predict and prevent failures before they occur.
+
+## The Cost of Reactive Maintenance
+
+Reactive maintenance—fixing things only after they break—is expensive and inefficient. Unplanned downtime, emergency repair costs, and lost energy production can significantly impact the bottom line.
+
+## How Predictive Maintenance Works
+
+Our predictive maintenance system combines multiple data sources:
+
+- **IoT Sensors**: Real-time monitoring of temperature, voltage, and current
+- **Drone Inspections**: Regular thermal and visual surveys
+- **Weather Data**: Historical and forecast data for environmental context
+- **AI Models**: Machine learning algorithms that predict failure patterns
+
+### Benefits
+
+- **Reduced Downtime**: Address issues before they cause outages
+- **Lower Costs**: Scheduled maintenance is cheaper than emergency repairs
+- **Extended Asset Life**: Early intervention prevents cascading damage
+- **Improved ROI**: Maximize energy production and revenue
+
+## Implementation at Scale
+
+Datafy Associate's predictive maintenance platform has been deployed across multiple solar installations, resulting in a 30% reduction in maintenance costs and a 15% improvement in overall equipment effectiveness (OEE).`,
+  },
+];

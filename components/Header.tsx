@@ -81,25 +81,25 @@ export default function Header() {
       >
         <div className="mx-auto max-w-7xl px-6 flex items-center justify-between">
           {/* Logo */}
-           <a href="#home" className="flex items-center gap-4 group">
-             <div className="relative w-16 h-16 flex items-center justify-center">
-               <img 
-                 src="/logo-transparent.png" 
-                 alt="Datafy Associates Logo" 
-                 className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-110"
-                 onError={(e) => {
-                   (e.target as HTMLImageElement).style.display = 'none';
-                 }}
-               />
-             </div>
-             <div className="leading-tight">
-               <span className="font-display font-bold text-2xl text-ink-900 block">
-                 Datafy
-               </span>
-               <span className="text-xs tracking-[0.25em] uppercase text-brand-600 font-bold">
-                 Associate
-               </span>
-             </div>
+            <a href="#home" className="flex items-center gap-4 group">
+              <div className="relative w-20 h-20 flex items-center justify-center">
+                <img 
+                  src="/logo-transparent.png" 
+                  alt="Datafy Associates Logo" 
+                  className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-110"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+              <div className="leading-tight">
+                <span className="font-display font-bold text-2xl text-ink-900 block">
+                  Datafy
+                </span>
+                <span className="text-xs tracking-[0.25em] uppercase text-brand-600 font-bold">
+                  Associate
+                </span>
+              </div>
            </a>
 
           {/* Desktop nav */}
