@@ -94,7 +94,7 @@ export default function VerificationPage() {
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div className="order-2 lg:order-1">
                <div className="relative rounded-3xl overflow-hidden aspect-[4/3]">
-                  <img src="https://images.unsplash.com/photo-1558444479-c86e4304709a?auto=format&fit=crop&w=1200&q=80" alt="Verification" className="w-full h-full object-cover" />
+                   <img src="/third-party-verification.png" alt="Verification" className="w-full h-full object-cover" />
                </div>
             </div>
             <div className="order-1 lg:order-2">
