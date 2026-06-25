@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, ChevronDown, Phone, Mail, Sun, Facebook, Instagram, Linkedin, Youtube } from "lucide-react";
 import { company, nav } from "@/lib/data";
@@ -172,13 +173,19 @@ export default function Header() {
           </nav>
 
           {/* CTA + mobile toggle */}
-          <div className="flex items-center gap-3">
-            <a
-              href="#contact"
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              href="/portal/login"
+              className="hidden md:inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-brand-200 text-brand-700 text-sm font-semibold hover:bg-brand-50 transition-colors"
+            >
+              O&amp;M Portal
+            </Link>
+            <Link
+              href="/d3/login"
               className="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-ink-900 text-white text-sm font-semibold hover:bg-brand-600 transition-colors shadow-lg"
             >
               {company.portalName} Login
-            </a>
+            </Link>
             <button
               onClick={() => setMobileOpen(true)}
               className="lg:hidden grid place-items-center w-10 h-10 rounded-xl bg-brand-50 text-ink-900"
@@ -255,13 +262,20 @@ export default function Header() {
                     )}
                   </div>
                 ))}
-                <a
-                  href="#contact"
+                <Link
+                  href="/portal/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="mt-3 inline-flex justify-center px-5 py-3 rounded-xl border border-brand-200 text-brand-700 text-sm font-semibold"
+                >
+                  O&amp;M Portal
+                </Link>
+                <Link
+                  href="/d3/login"
                   onClick={() => setMobileOpen(false)}
                   className="mt-3 inline-flex justify-center px-5 py-3 rounded-xl bg-brand-600 text-white text-sm font-semibold"
                 >
                   {company.portalName} Login
-                </a>
+                </Link>
               </nav>
             </motion.div>
           </>
