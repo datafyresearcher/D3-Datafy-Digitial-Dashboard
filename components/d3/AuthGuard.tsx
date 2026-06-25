@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSession, type User } from "@/lib/auth";
+import { supabase } from "@/lib/supabase/browser";
 import { Loader2 } from "lucide-react";
 
 /**
- * Client-side guard for the portal. Redirects to /d3/login when no
+ * Client-side guard for the D³ portal. Redirects to /d3/login when no
  * session is present, otherwise renders children with the resolved user.
  */
 export default function AuthGuard({
@@ -20,13 +21,28 @@ export default function AuthGuard({
   const [status, setStatus] = useState<"loading" | "ready">("loading");
 
   useEffect(() => {
-    const user = getSession();
-    if (!user) {
-      router.replace("/d3/login");
-      return;
-    }
-    onUser?.(user);
-    setStatus("ready");
+    let active = true;
+    const init = async () => {
+      const user = await getSession();
+      if (!active) return;
+      if (!user) {
+        router.replace("/d3/login");
+        return;
+      }
+      onUser?.(user);
+      setStatus("ready");
+    };
+    init();
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) return;
+      const user = await getSession();
+      if (!user) router.replace("/d3/login");
+    });
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
   }, [router, onUser]);
 
   if (status !== "ready") {

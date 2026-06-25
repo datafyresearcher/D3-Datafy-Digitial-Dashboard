@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Building2,
   Plus,
@@ -13,7 +13,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import type { User } from "@/lib/auth";
-import { addOmUser, omUsers } from "@/lib/auth";
+import { addOmUser, getOmUsersForClient } from "@/lib/auth";
+import { supabase } from "@/lib/supabase/browser";
 import {
   type Store,
   type Client,
@@ -56,7 +57,48 @@ export default function ClientsView({ user, store }: { user: User; store: Store 
   const [showForm, setShowForm] = useState(false);
   const [activityFor, setActivityFor] = useState<Client | null>(null);
   const [usersFor, setUsersFor] = useState<Client | null>(null);
+  const [clientUsers, setClientUsers] = useState<User[]>([]);
   const [creds, setCreds] = useState<{ email: string; password: string } | null>(null);
+  const [formError, setFormError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  // Fetch the profiles linked to the selected client whenever the Users modal opens.
+  useEffect(() => {
+    if (!usersFor) {
+      setClientUsers([]);
+      return;
+    }
+    let active = true;
+    (async () => {
+      const demoUsers = getOmUsersForClient(usersFor.id);
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("client_id", usersFor.id);
+        if (!active) return;
+        const remoteUsers = (data ?? []).map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          email: r.email,
+          password: "",
+          role: r.role,
+          company: r.company ?? undefined,
+          clientId: r.client_id ?? undefined,
+          clientSubRole: r.client_sub_role ?? undefined,
+          lastLogin: r.last_login,
+        }));
+        const byEmail = new Map<string, User>();
+        for (const u of [...remoteUsers, ...demoUsers]) byEmail.set(u.email, u);
+        setClientUsers([...byEmail.values()]);
+      } catch {
+        if (active) setClientUsers(demoUsers);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [usersFor]);
 
   const filtered = useMemo(
     () =>
@@ -132,9 +174,9 @@ export default function ClientsView({ user, store }: { user: User; store: Store 
                 <Button
                   size="sm"
                   variant="danger"
-                  onClick={() => {
+                  onClick={async () => {
                     if (confirm(`Delete ${c.company}? This removes their projects too.`))
-                      deleteClient(c.id, user);
+                      await deleteClient(c.id, user);
                   }}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -154,24 +196,36 @@ export default function ClientsView({ user, store }: { user: User; store: Store 
       {/* Create/Edit modal */}
       <ClientForm
         open={showForm}
-        onClose={() => setShowForm(false)}
+        onClose={() => { setShowForm(false); setFormError(""); }}
         client={editing}
-        onSubmit={(data) => {
-          if (editing) {
-            updateClient(editing.id, data, user);
-          } else {
-            const c = createClient({ ...data }, user);
-            const password = genPassword();
-            addOmUser({
-              name: c.contactName,
-              email: c.email,
-              password,
-              company: c.company,
-              clientId: c.id,
-            });
-            setCreds({ email: c.email, password });
+        submitting={submitting}
+        error={formError}
+        onSubmit={async (data) => {
+          setFormError("");
+          setSubmitting(true);
+          try {
+            if (editing) {
+              await updateClient(editing.id, data, user);
+              setShowForm(false);
+            } else {
+              const password = genPassword();
+              const c = await createClient({ ...data }, user);
+              await addOmUser({
+                name: c.contactName,
+                email: c.email,
+                password,
+                company: c.company,
+                clientId: c.id,
+              });
+              setShowForm(false);
+              setCreds({ email: c.email, password });
+            }
+          } catch (err) {
+            console.error("Onboard client failed:", err);
+            setFormError("Could not create the client. Please try again.");
+          } finally {
+            setSubmitting(false);
           }
-          setShowForm(false);
         }}
       />
 
@@ -218,23 +272,21 @@ export default function ClientsView({ user, store }: { user: User; store: Store 
             <p className="text-xs text-white/50">
               Users associated with this client. Sub-roles are controlled by Datafy.
             </p>
-            {Object.values(omUsers)
-              .filter((u) => u.clientId === usersFor.id)
-              .map((u) => (
-                <div key={u.id} className="flex items-center gap-3 rounded-xl bg-white/5 p-3">
-                  <div className="grid place-items-center w-9 h-9 rounded-full bg-brand-500/20 text-brand-300 text-xs font-bold">
-                    {u.name.split(" ").map((p) => p[0]).slice(0, 2).join("")}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{u.name}</p>
-                    <p className="text-xs text-white/50 truncate">{u.email}</p>
-                  </div>
-                  <Badge tone={u.clientSubRole === "client_admin" ? "purple" : "blue"}>
-                    {u.clientSubRole === "client_admin" ? "Admin (all projects)" : "Viewer"}
-                  </Badge>
+            {clientUsers.map((u) => (
+              <div key={u.id} className="flex items-center gap-3 rounded-xl bg-white/5 p-3">
+                <div className="grid place-items-center w-9 h-9 rounded-full bg-brand-500/20 text-brand-300 text-xs font-bold">
+                  {u.name.split(" ").map((p) => p[0]).slice(0, 2).join("")}
                 </div>
-              ))}
-            {Object.values(omUsers).filter((u) => u.clientId === usersFor.id).length === 0 && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{u.name}</p>
+                  <p className="text-xs text-white/50 truncate">{u.email}</p>
+                </div>
+                <Badge tone={u.clientSubRole === "client_admin" ? "purple" : "blue"}>
+                  {u.clientSubRole === "client_admin" ? "Admin (all projects)" : "Viewer"}
+                </Badge>
+              </div>
+            ))}
+            {clientUsers.length === 0 && (
               <p className="text-center text-white/40 text-sm py-4">No users linked yet.</p>
             )}
             <div className="rounded-xl bg-brand-500/5 border border-brand-500/20 p-3 text-xs text-white/60 flex items-center gap-2">
@@ -253,11 +305,15 @@ function ClientForm({
   onClose,
   client,
   onSubmit,
+  submitting = false,
+  error = "",
 }: {
   open: boolean;
   onClose: () => void;
   client: Client | null;
   onSubmit: (data: Omit<Client, "id" | "createdAt" | "activity">) => void;
+  submitting?: boolean;
+  error?: string;
 }) {
   const [form, setForm] = useState<Omit<Client, "id" | "createdAt" | "activity">>({
     company: client?.company ?? "",
@@ -315,9 +371,16 @@ function ClientForm({
             </Select>
           </Field>
         </div>
+        {error && (
+          <p className="text-red-400 text-sm text-center bg-red-500/10 border border-red-500/20 rounded-lg py-2">
+            {error}
+          </p>
+        )}
         <div className="flex gap-2 pt-2">
-          <Button type="submit" className="flex-1">{client ? "Save changes" : "Create & generate credentials"}</Button>
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button type="submit" className="flex-1" disabled={submitting}>
+            {submitting ? "Creating…" : client ? "Save changes" : "Create & generate credentials"}
+          </Button>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>Cancel</Button>
         </div>
       </form>
     </Modal>

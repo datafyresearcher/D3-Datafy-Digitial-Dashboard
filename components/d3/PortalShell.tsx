@@ -38,8 +38,8 @@ export default function PortalShell({ user }: { user: User }) {
   const [siteId, setSiteId] = useState(sites[0].id);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.replace("/d3/login");
   };
 

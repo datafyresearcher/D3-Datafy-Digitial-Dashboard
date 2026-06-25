@@ -29,6 +29,7 @@ import {
   inspectionsFor,
   addInspection,
   updateInspection,
+  addAnomaly,
   toggleAnomaly,
   persistentAnomalies,
   uid,
@@ -217,21 +218,15 @@ function InspectionDetail({ open, onClose, inspection, user }: { open: boolean; 
     const rect = layoutRef.current.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
-    updateInspection(inspection.id, {
-      anomalies: [
-        ...inspection.anomalies,
-        {
-          id: uid("an"),
-          panelId: newPin.panelId || "—",
-          type: newPin.type,
-          severity: newPin.severity,
-          status: "Open",
-          detectedAt: inspection.date,
-          x,
-          y,
-        },
-      ],
-    }, user);
+    addAnomaly(inspection.id, {
+      panelId: newPin.panelId || "—",
+      type: newPin.type,
+      severity: newPin.severity,
+      status: "Open",
+      detectedAt: inspection.date,
+      x,
+      y,
+    });
     setPinning(false);
   };
 
@@ -317,7 +312,7 @@ function InspectionDetail({ open, onClose, inspection, user }: { open: boolean; 
           <div className="space-y-1.5">
             {inspection.anomalies.map((a) => (
               <div key={a.id} className="flex items-center gap-3 rounded-lg bg-white/5 px-3 py-2 text-sm">
-                <button onClick={() => toggleAnomaly(inspection.id, a.id, user)} className="flex-shrink-0">
+                <button onClick={() => toggleAnomaly(inspection.id, a.id)} className="flex-shrink-0">
                   {a.status === "Open" ? <Circle className="w-4 h-4 text-red-400" /> : <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
                 </button>
                 <span className="font-mono text-white/90 w-20">{a.panelId}</span>

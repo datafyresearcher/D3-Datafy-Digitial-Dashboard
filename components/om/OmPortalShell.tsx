@@ -75,8 +75,8 @@ export default function OmPortalShell({ user }: { user: User }) {
     [user.name]
   );
 
-  const handleLogout = () => {
-    omLogout();
+  const handleLogout = async () => {
+    await omLogout();
     router.replace("/portal/login");
   };
 

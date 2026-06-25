@@ -1,16 +1,34 @@
 /**
- * lib/om.ts — O&M Portal data layer.
+ * lib/om.ts — O&M Portal data layer (Supabase-backed).
  *
- * A single localStorage-backed store powers all six modules. It is
- * intentionally framework-light: a plain object + a tiny pub/sub so
- * React components re-render on change. In production this would be a
- * REST/GraphQL API; the selector signatures below are designed to map
- * cleanly onto one.
+ * Architecture: the UI consumes a SYNCHRONOUS store via useSyncExternalStore
+ * (see components/om/useOmStore.ts). To avoid rewriting every view, this
+ * module keeps that synchronous contract but hydrates an in-memory cache
+ * from Supabase and refetches after every mutation. RLS enforces
+ * row-level access server-side; here we just read/write what RLS allows.
+ *
+ * Public API (unchanged from the localStorage version):
+ *   getStore(), subscribe(), resetStore()
+ *   visibleProjects/visibleClients/getProject/getClient
+ *   createClient/updateClient/deleteClient
+ *   createProject/updateProject/deleteProject
+ *   addVisit/updateVisit/visitsFor/toggleDefect
+ *   addInspection/updateInspection/toggleAnomaly/inspectionsFor
+ *   addPerformance/performanceFor/performanceRatio/co2OffsetKg/parsePerformanceCsv
+ *   addDoc/deleteDoc/docsFor
+ *   logAudit/logClientActivity
+ *   maintenanceStatus/healthScore
+ *   uid/nowISO
  */
 
+import { supabase } from "@/lib/supabase/browser";
 import type { User } from "./auth";
+import { seedStore } from "./om-seed";
+
+const STORE_KEY = "om_store_v1";
 
 /* ============================== Types =============================== */
+// (unchanged — kept verbatim so consumers don't break)
 
 export type ClientStatus = "Active" | "Suspended" | "Archived";
 export type BillingTier = "Basic" | "Pro" | "Enterprise";
@@ -41,9 +59,7 @@ export type GridType = "On-grid" | "Off-grid" | "Hybrid";
 export type StringZone = {
   id: string;
   name: string;
-  /** number of panels in this string/zone */
   panelCount: number;
-  /** free text, e.g. "Roof block A east" */
   location: string;
 };
 
@@ -76,7 +92,6 @@ export type Project = {
   status: ProjectStatus;
   stringZones: StringZone[];
   gallery: GalleryImage[];
-  /** free-text notes visible to the client */
   clientNotes: string;
   maintenanceSchedule: ScheduleFrequency[];
 };
@@ -89,7 +104,7 @@ export type Weather = "Sunny" | "Cloudy" | "Overcast" | "Rainy";
 export type VisitImage = {
   id: string;
   url: string;
-  tag: string; // zone/string tag
+  tag: string;
   kind: "before" | "after";
 };
 
@@ -113,7 +128,7 @@ export type MaintenanceVisit = {
   postObservation: string;
   images: VisitImage[];
   defects: DefectEntry[];
-  signature: string; // typed sign-off name
+  signature: string;
   createdAt: string;
 };
 
@@ -125,9 +140,7 @@ export type DroneInspection = {
   rgbUrl?: string;
   thermalUrl?: string;
   reportPdfUrl?: string;
-  /** processed anomaly overlay images */
   processedImages: { id: string; url: string; label: string }[];
-  /** background layout image for pinning anomalies */
   layoutUrl?: string;
   anomalies: Anomaly[];
   createdAt: string;
@@ -150,7 +163,6 @@ export type Anomaly = {
   status: AnomalyStatus;
   detectedAt: string;
   resolvedAt?: string;
-  /** pin position on the layout image, in percent (0-100) */
   x?: number;
   y?: number;
   note?: string;
@@ -159,9 +171,8 @@ export type Anomaly = {
 export type PerformanceRecord = {
   id: string;
   projectId: string;
-  date: string; // YYYY-MM-DD
+  date: string;
   energyKWh: number;
-  /** expected yield for the day, kWp * peak-sun-hours */
   expectedKWh: number;
 };
 
@@ -204,295 +215,49 @@ export type Store = {
 
 /* ============================== Store =============================== */
 
-const STORE_KEY = "om_store_v1";
-
 let cache: Store | null = null;
+let loading: Promise<void> | null = null;
 type Listener = () => void;
 const listeners = new Set<Listener>();
 
-function uid(prefix = "id"): string {
+export function uid(prefix = "id"): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-4)}`;
 }
 
-function nowISO(): string {
+export function nowISO(): string {
   return new Date().toISOString();
-}
-
-function seed(): Store {
-  return {
-    clients: [
-      {
-        id: "c-nestle",
-        company: "Nestlé Pakistan",
-        contactName: "Ahsan Khan",
-        email: "client@nestle.com",
-        phone: "+92 300 1234567",
-        billingTier: "Enterprise",
-        status: "Active",
-        createdAt: "2021-03-01T00:00:00Z",
-        activity: [
-          { id: uid(), ts: "2026-06-20T08:14:00Z", type: "login", detail: "Logged in" },
-          { id: uid(), ts: "2026-06-18T11:02:00Z", type: "download", detail: "Downloaded performance report" },
-        ],
-      },
-      {
-        id: "c-jzs",
-        company: "JZS Farm",
-        contactName: "Imran Yousuf",
-        email: "viewer@jzs.com",
-        phone: "+92 321 7654321",
-        billingTier: "Pro",
-        status: "Active",
-        createdAt: "2019-08-15T00:00:00Z",
-        activity: [
-          { id: uid(), ts: "2026-06-22T07:30:00Z", type: "login", detail: "Logged in" },
-          { id: uid(), ts: "2026-06-15T09:45:00Z", type: "view", detail: "Viewed drone inspection" },
-        ],
-      },
-      {
-        id: "c-qa",
-        company: "Quaid-e-Azam Solar Power",
-        contactName: "Bilal Ahmed",
-        email: "bilal@qasp.com.pk",
-        phone: "+92 333 9876543",
-        billingTier: "Enterprise",
-        status: "Active",
-        createdAt: "2015-05-01T00:00:00Z",
-        activity: [
-          { id: uid(), ts: "2026-06-21T13:20:00Z", type: "login", detail: "Logged in" },
-        ],
-      },
-    ],
-    projects: [
-      {
-        id: "p-nestle-1",
-        clientId: "c-nestle",
-        name: "Nestlé Sheikhupura Rooftop",
-        address: "Ferozewala, Sheikhupura, Punjab",
-        lat: 31.516,
-        lng: 74.0167,
-        sizeKWp: 450,
-        panelCount: 11250,
-        inverterBrand: "Huawei",
-        inverterModel: "SUN2000-100KTL",
-        hasBattery: false,
-        gridType: "On-grid",
-        installedAt: "2021-03-15",
-        warrantyExpiry: "2031-03-15",
-        siteContactName: "Tariq Mehmood",
-        siteContactPhone: "+92 300 5551122",
-        classification: "Industrial",
-        status: "Active",
-        stringZones: [
-          { id: uid(), name: "String 1-12", panelCount: 1320, location: "Roof block A" },
-          { id: uid(), name: "String 13-24", panelCount: 1320, location: "Roof block B" },
-        ],
-        gallery: [],
-        clientNotes: "Quarterly performance review scheduled with sustainability team.",
-        maintenanceSchedule: ["Quarterly"],
-      },
-      {
-        id: "p-jzs-1",
-        clientId: "c-jzs",
-        name: "JZS Sahiwal Ground-Mount",
-        address: "Sahiwal, Punjab",
-        lat: 30.6662,
-        lng: 73.0223,
-        sizeKWp: 20,
-        panelCount: 8224,
-        inverterBrand: "Sungrow",
-        inverterModel: "SG250HX",
-        hasBattery: true,
-        batterySystem: "Tesla Powerpack 200 kWh",
-        gridType: "Hybrid",
-        installedAt: "2019-08-20",
-        warrantyExpiry: "2029-08-20",
-        siteContactName: "Imran Yousuf",
-        siteContactPhone: "+92 321 7654321",
-        classification: "Commercial",
-        status: "Active",
-        stringZones: [
-          { id: uid(), name: "Zone A", panelCount: 4112, location: "North array" },
-          { id: uid(), name: "Zone B", panelCount: 4112, location: "South array" },
-        ],
-        gallery: [],
-        clientNotes: "Bird-deterrent netting installed in Zone B (May 2026).",
-        maintenanceSchedule: ["Monthly"],
-      },
-      {
-        id: "p-qa-1",
-        clientId: "c-qa",
-        name: "QASP Phase-I 100MW",
-        address: "Lal Suhanra, Bahawalpur",
-        lat: 29.3858,
-        lng: 71.6908,
-        sizeKWp: 100000,
-        panelCount: 411200,
-        inverterBrand: "Sungrow",
-        inverterModel: "SG2500HV",
-        hasBattery: false,
-        gridType: "On-grid",
-        installedAt: "2015-05-01",
-        warrantyExpiry: "2025-05-01",
-        siteContactName: "Bilal Ahmed",
-        siteContactPhone: "+92 333 9876543",
-        classification: "Industrial",
-        status: "Under Maintenance",
-        stringZones: [
-          { id: uid(), name: "Block A", panelCount: 102800, location: "West field" },
-          { id: uid(), name: "Block B", panelCount: 102800, location: "East field" },
-        ],
-        gallery: [],
-        clientNotes: "Inverter firmware upgrade underway for Block A.",
-        maintenanceSchedule: ["Monthly", "Half-yearly"],
-      },
-    ],
-    visits: [
-      {
-        id: uid("v"),
-        projectId: "p-nestle-1",
-        date: "2026-05-12",
-        technician: "Shahzad Hassan",
-        cleaningType: "Wet cleaning",
-        weather: "Sunny",
-        preObservation: "Moderate dust accumulation observed on block A.",
-        postObservation: "All panels cleaned. Post-clean IR readings nominal.",
-        images: [],
-        defects: [
-          {
-            id: uid(),
-            category: "Soiling",
-            description: "Heavy soiling on panel A-204",
-            status: "Resolved",
-            openedAt: "2026-05-12T09:00:00Z",
-            resolvedAt: "2026-05-12T11:30:00Z",
-          },
-        ],
-        signature: "Shahzad Hassan",
-        createdAt: "2026-05-12T08:00:00Z",
-      },
-    ],
-    inspections: [
-      {
-        id: uid("ins"),
-        projectId: "p-nestle-1",
-        date: "2026-04-10",
-        processedImages: [],
-        anomalies: [
-          {
-            id: uid(),
-            panelId: "A-104",
-            type: "Hotspot",
-            severity: "Critical",
-            status: "Open",
-            detectedAt: "2026-04-10",
-            x: 32,
-            y: 45,
-            note: "ΔT 22°C",
-          },
-          {
-            id: uid(),
-            panelId: "B-058",
-            type: "Soiling",
-            severity: "Info",
-            status: "Resolved",
-            detectedAt: "2026-04-10",
-            resolvedAt: "2026-05-12",
-            x: 68,
-            y: 60,
-          },
-        ],
-        createdAt: "2026-04-10T00:00:00Z",
-      },
-    ],
-    performance: seedPerformance(),
-    docs: [
-      {
-        id: uid(),
-        projectId: "p-nestle-1",
-        name: "Module Warranty 25yr.pdf",
-        type: "Warranty",
-        url: "#",
-        uploadedAt: "2021-03-16T00:00:00Z",
-        uploadedBy: "admin@datafy.com",
-      },
-      {
-        id: uid(),
-        projectId: "p-nestle-1",
-        name: "Huawei SUN2000 Manual.pdf",
-        type: "Inverter manual",
-        url: "#",
-        uploadedAt: "2021-03-16T00:00:00Z",
-        uploadedBy: "admin@datafy.com",
-      },
-    ],
-    audit: [
-      {
-        id: uid(),
-        ts: "2026-06-20T08:14:00Z",
-        userId: "om-client-1",
-        userName: "Ahsan Khan",
-        action: "download",
-        target: "Performance report (p-nestle-1)",
-      },
-    ],
-  };
-}
-
-function seedPerformance(): PerformanceRecord[] {
-  const out: PerformanceRecord[] = [];
-  const projects = [
-    { id: "p-nestle-1", kwp: 450, psh: 4.6 },
-    { id: "p-jzs-1", kwp: 20, psh: 4.7 },
-    { id: "p-qa-1", kwp: 100000, psh: 4.8 },
-  ];
-  const today = new Date("2026-06-20T00:00:00Z");
-  for (const p of projects) {
-    for (let d = 29; d >= 0; d--) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - d);
-      const wave = Math.sin(d / 3.5) * 0.1 + 0.92;
-      const expected = +(p.kwp * p.psh).toFixed(1);
-      out.push({
-        id: uid("perf"),
-        projectId: p.id,
-        date: date.toISOString().slice(0, 10),
-        energyKWh: +(expected * wave).toFixed(1),
-        expectedKWh: expected,
-      });
-    }
-  }
-  return out;
-}
-
-function load(): Store {
-  if (cache) return cache;
-  if (typeof window === "undefined") {
-    cache = seed();
-    return cache;
-  }
-  try {
-    const raw = window.localStorage.getItem(STORE_KEY);
-    if (raw) {
-      cache = JSON.parse(raw) as Store;
-      return cache;
-    }
-  } catch {
-    /* fall through to seed */
-  }
-  cache = seed();
-  persist();
-  return cache;
-}
-
-function persist() {
-  if (cache && typeof window !== "undefined") {
-    window.localStorage.setItem(STORE_KEY, JSON.stringify(cache));
-  }
 }
 
 function emit() {
   listeners.forEach((l) => l());
+}
+
+async function hasSupabaseSession(): Promise<boolean> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    return !!data.session?.user;
+  } catch {
+    return false;
+  }
+}
+
+function loadLocalStore(): Store {
+  if (typeof window === "undefined") return emptyStore();
+  try {
+    const raw = window.localStorage.getItem(STORE_KEY);
+    if (raw) return JSON.parse(raw) as Store;
+  } catch {
+    // corrupt data — re-seed below
+  }
+  const seeded = seedStore(uid);
+  persistLocalStore(seeded);
+  return seeded;
+}
+
+function persistLocalStore(store: Store) {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(STORE_KEY, JSON.stringify(store));
+  }
 }
 
 /** Subscribe to store changes; returns an unsubscribe fn. */
@@ -501,42 +266,293 @@ export function subscribe(l: Listener): () => void {
   return () => listeners.delete(l);
 }
 
+/** Empty store returned before the first Supabase fetch resolves. */
+function emptyStore(): Store {
+  return {
+    clients: [],
+    projects: [],
+    visits: [],
+    inspections: [],
+    performance: [],
+    docs: [],
+    audit: [],
+  };
+}
+
+/** Synchronous snapshot. Triggers a background load on first call. */
 export function getStore(): Store {
-  return load();
+  if (!cache) {
+    cache = emptyStore();
+    // Fire-and-forget; callers will re-render once data lands.
+    void refresh();
+  }
+  return cache;
 }
 
-/** Replace the whole store (used by the settings "reset demo data" action). */
-export function resetStore(): void {
-  cache = seed();
-  persist();
+/* --------------------- Supabase <-> domain mappers ----------------- */
+
+function mapClient(r: any, activity: ActivityEvent[] = []): Client {
+  return {
+    id: r.id,
+    company: r.company,
+    contactName: r.contact_name,
+    email: r.email,
+    phone: r.phone ?? "",
+    billingTier: r.billing_tier,
+    status: r.status,
+    createdAt: r.created_at,
+    activity,
+  };
+}
+
+function mapProject(r: any): Project {
+  return {
+    id: r.id,
+    clientId: r.client_id,
+    name: r.name,
+    address: r.address,
+    lat: Number(r.lat),
+    lng: Number(r.lng),
+    sizeKWp: Number(r.size_kwp),
+    panelCount: r.panel_count,
+    inverterBrand: r.inverter_brand ?? "",
+    inverterModel: r.inverter_model ?? "",
+    hasBattery: !!r.has_battery,
+    batterySystem: r.battery_system ?? undefined,
+    gridType: r.grid_type,
+    installedAt: r.installed_at,
+    warrantyExpiry: r.warranty_expiry,
+    siteContactName: r.site_contact_name ?? "",
+    siteContactPhone: r.site_contact_phone ?? "",
+    classification: r.classification,
+    status: r.status,
+    stringZones: r.string_zones ?? [],
+    gallery: r.gallery ?? [],
+    clientNotes: r.client_notes ?? "",
+    maintenanceSchedule: r.maintenance_schedule ?? [],
+  };
+}
+
+function mapVisit(r: any, defects: DefectEntry[] = []): MaintenanceVisit {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    date: r.date,
+    technician: r.technician ?? "",
+    cleaningType: r.cleaning_type,
+    weather: r.weather,
+    preObservation: r.pre_observation ?? "",
+    postObservation: r.post_observation ?? "",
+    images: r.images ?? [],
+    defects,
+    signature: r.signature ?? "",
+    createdAt: r.created_at,
+  };
+}
+
+function mapDefect(r: any): DefectEntry {
+  return {
+    id: r.id,
+    category: r.category,
+    description: r.description ?? "",
+    status: r.status,
+    openedAt: r.opened_at,
+    resolvedAt: r.resolved_at ?? undefined,
+  };
+}
+
+function mapInspection(r: any, anomalies: Anomaly[] = []): DroneInspection {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    date: r.date,
+    orthomosaicUrl: r.orthomosaic_url ?? undefined,
+    rgbUrl: r.rgb_url ?? undefined,
+    thermalUrl: r.thermal_url ?? undefined,
+    reportPdfUrl: r.report_pdf_url ?? undefined,
+    processedImages: r.processed_images ?? [],
+    layoutUrl: r.layout_url ?? undefined,
+    anomalies,
+    createdAt: r.created_at,
+  };
+}
+
+function mapAnomaly(r: any): Anomaly {
+  return {
+    id: r.id,
+    panelId: r.panel_id,
+    type: r.type,
+    severity: r.severity,
+    status: r.status,
+    detectedAt: r.detected_at,
+    resolvedAt: r.resolved_at ?? undefined,
+    x: r.x != null ? Number(r.x) : undefined,
+    y: r.y != null ? Number(r.y) : undefined,
+    note: r.note ?? undefined,
+  };
+}
+
+function mapPerformance(r: any): PerformanceRecord {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    date: r.date,
+    energyKWh: Number(r.energy_kwh),
+    expectedKWh: Number(r.expected_kwh),
+  };
+}
+
+function mapDoc(r: any): VaultDoc {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    name: r.name,
+    type: r.type,
+    url: r.url,
+    uploadedAt: r.uploaded_at,
+    uploadedBy: r.uploaded_by ?? "",
+  };
+}
+
+function mapAudit(r: any): AuditEntry {
+  return {
+    id: r.id,
+    ts: r.ts,
+    userId: r.user_id,
+    userName: r.user_name,
+    action: r.action,
+    target: r.target,
+  };
+}
+
+/** Fetch all rows (RLS scopes them to the current user). */
+export async function refresh(): Promise<void> {
+  // Serialize concurrent refreshes.
+  if (loading) return loading;
+  loading = (async () => {
+    try {
+      const remote = await hasSupabaseSession();
+      if (!remote) {
+        cache = loadLocalStore();
+        emit();
+        return;
+      }
+
+      const [
+        clientsR,
+        activityR,
+        projectsR,
+        visitsR,
+        defectsR,
+        inspectionsR,
+        anomaliesR,
+        perfR,
+        docsR,
+        auditR,
+      ] = await Promise.all([
+        supabase.from("clients").select("*"),
+        supabase.from("client_activity").select("*"),
+        supabase.from("projects").select("*"),
+        supabase.from("visits").select("*"),
+        supabase.from("defects").select("*"),
+        supabase.from("inspections").select("*"),
+        supabase.from("anomalies").select("*"),
+        supabase.from("performance").select("*"),
+        supabase.from("docs").select("*"),
+        supabase.from("audit").select("*"),
+      ]);
+
+      const activityByClient = new Map<string, ActivityEvent[]>();
+      for (const a of (activityR.data ?? []) as any[]) {
+        const list = activityByClient.get(a.client_id) ?? [];
+        list.push({
+          id: a.id,
+          ts: a.ts,
+          type: a.type,
+          detail: a.detail ?? "",
+        });
+        activityByClient.set(a.client_id, list);
+      }
+
+      const defectsByVisit = new Map<string, DefectEntry[]>();
+      for (const d of (defectsR.data ?? []) as any[]) {
+        const list = defectsByVisit.get(d.visit_id) ?? [];
+        list.push(mapDefect(d));
+        defectsByVisit.set(d.visit_id, list);
+      }
+
+      const anomaliesByInspection = new Map<string, Anomaly[]>();
+      for (const a of (anomaliesR.data ?? []) as any[]) {
+        const list = anomaliesByInspection.get(a.inspection_id) ?? [];
+        list.push(mapAnomaly(a));
+        anomaliesByInspection.set(a.inspection_id, list);
+      }
+
+      cache = {
+        clients: ((clientsR.data ?? []) as any[]).map((r) =>
+          mapClient(r, activityByClient.get(r.id) ?? [])
+        ),
+        projects: ((projectsR.data ?? []) as any[]).map(mapProject),
+        visits: ((visitsR.data ?? []) as any[]).map((r) =>
+          mapVisit(r, defectsByVisit.get(r.id) ?? [])
+        ),
+        inspections: ((inspectionsR.data ?? []) as any[]).map((r) =>
+          mapInspection(r, anomaliesByInspection.get(r.id) ?? [])
+        ),
+        performance: ((perfR.data ?? []) as any[]).map(mapPerformance),
+        docs: ((docsR.data ?? []) as any[]).map(mapDoc),
+        audit: ((auditR.data ?? []) as any[]).map(mapAudit),
+      };
+      emit();
+    } finally {
+      loading = null;
+    }
+  })();
+  return loading;
+}
+
+/** Replace the cache from the server (used by the "reset demo data" action). */
+export async function resetStore(): Promise<void> {
+  const remote = await hasSupabaseSession();
+  if (remote) {
+    await refresh();
+    return;
+  }
+  cache = seedStore(uid);
+  persistLocalStore(cache);
   emit();
 }
 
-/** Internal mutator: updates the store and notifies listeners. */
-function mutate(fn: (s: Store) => void) {
-  const s = load();
-  fn(s);
-  persist();
-  emit();
+/** Mutate the cache locally then reload from server so it stays in sync. */
+async function mutate(localFn: (s: Store) => void): Promise<void> {
+  if (!cache) cache = emptyStore();
+  localFn(cache);
+  emit(); // optimistic UI update
+  const remote = await hasSupabaseSession();
+  if (remote) {
+    await refresh(); // reconcile with server truth
+  } else {
+    persistLocalStore(cache);
+  }
 }
 
 /* ===================== Audit + activity helpers ==================== */
 
-export function logAudit(user: User, action: AuditEntry["action"], target: string) {
-  mutate((s) => {
-    s.audit.unshift({
-      id: uid(),
-      ts: nowISO(),
-      userId: user.id,
-      userName: user.name,
-      action,
-      target,
-    });
+export async function logAudit(user: User, action: AuditEntry["action"], target: string) {
+  await supabase.from("audit").insert({
+    user_id: user.id,
+    user_name: user.name,
+    action,
+    target,
+  });
+  await mutate((s) => {
+    s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action, target });
   });
 }
 
-export function logClientActivity(clientId: string, ev: Omit<ActivityEvent, "id" | "ts">) {
-  mutate((s) => {
+export async function logClientActivity(clientId: string, ev: Omit<ActivityEvent, "id" | "ts">) {
+  await supabase.from("client_activity").insert({ client_id: clientId, type: ev.type, detail: ev.detail });
+  await mutate((s) => {
     const c = s.clients.find((x) => x.id === clientId);
     if (c) c.activity.unshift({ id: uid(), ts: nowISO(), ...ev });
   });
@@ -544,7 +560,6 @@ export function logClientActivity(clientId: string, ev: Omit<ActivityEvent, "id"
 
 /* ============================ Selectors ============================= */
 
-/** Projects visible to a given user, honouring client scoping. */
 export function visibleProjects(user: User | null): Project[] {
   const s = getStore();
   if (!user) return [];
@@ -571,14 +586,29 @@ export function getClient(id: string): Client | undefined {
 
 /* =================== Module 1: Clients CRUD ======================== */
 
-export function createClient(input: Omit<Client, "id" | "createdAt" | "activity">, user: User) {
+export async function createClient(input: Omit<Client, "id" | "createdAt" | "activity">, user: User) {
+  const id = uid("c");
   const client: Client = {
     ...input,
-    id: uid("c"),
+    id,
     createdAt: nowISO(),
     activity: [{ id: uid(), ts: nowISO(), type: "create", detail: "Client onboarded" }],
   };
-  mutate((s) => {
+
+  if (await hasSupabaseSession()) {
+    const { error } = await supabase.from("clients").insert({
+      id,
+      company: input.company,
+      contact_name: input.contactName,
+      email: input.email,
+      phone: input.phone,
+      billing_tier: input.billingTier,
+      status: input.status,
+    });
+    if (error) throw error;
+  }
+
+  await mutate((s) => {
     s.clients.push(client);
     s.audit.unshift({
       id: uid(),
@@ -586,120 +616,172 @@ export function createClient(input: Omit<Client, "id" | "createdAt" | "activity"
       userId: user.id,
       userName: user.name,
       action: "create",
-      target: `Client ${client.company}`,
+      target: `Client ${input.company}`,
     });
   });
   return client;
 }
 
-export function updateClient(id: string, patch: Partial<Client>, user: User) {
-  mutate((s) => {
+export async function updateClient(id: string, patch: Partial<Client>, user: User) {
+  const row: Record<string, unknown> = {};
+  if (patch.company !== undefined) row.company = patch.company;
+  if (patch.contactName !== undefined) row.contact_name = patch.contactName;
+  if (patch.email !== undefined) row.email = patch.email;
+  if (patch.phone !== undefined) row.phone = patch.phone;
+  if (patch.billingTier !== undefined) row.billing_tier = patch.billingTier;
+  if (patch.status !== undefined) row.status = patch.status;
+  await supabase.from("clients").update(row).eq("id", id);
+  await mutate((s) => {
     const c = s.clients.find((x) => x.id === id);
     if (c) Object.assign(c, patch);
-    s.audit.unshift({
-      id: uid(),
-      ts: nowISO(),
-      userId: user.id,
-      userName: user.name,
-      action: "edit",
-      target: `Client ${id}`,
-    });
+    s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "edit", target: `Client ${id}` });
   });
 }
 
-export function deleteClient(id: string, user: User) {
-  mutate((s) => {
+export async function deleteClient(id: string, user: User) {
+  await supabase.from("clients").delete().eq("id", id);
+  await mutate((s) => {
     s.clients = s.clients.filter((c) => c.id !== id);
     s.projects = s.projects.filter((p) => p.clientId !== id);
-    s.audit.unshift({
-      id: uid(),
-      ts: nowISO(),
-      userId: user.id,
-      userName: user.name,
-      action: "delete",
-      target: `Client ${id}`,
-    });
+    s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "delete", target: `Client ${id}` });
   });
 }
 
 /* =================== Module 2: Projects CRUD ======================= */
 
-export function createProject(input: Omit<Project, "id" | "stringZones" | "gallery" | "clientNotes" | "maintenanceSchedule"> & Partial<Pick<Project, "stringZones" | "gallery" | "clientNotes" | "maintenanceSchedule">>, user: User) {
+export async function createProject(
+  input: Omit<Project, "id" | "stringZones" | "gallery" | "clientNotes" | "maintenanceSchedule"> &
+    Partial<Pick<Project, "stringZones" | "gallery" | "clientNotes" | "maintenanceSchedule">>,
+  user: User
+) {
+  const id = uid("p");
   const project: Project = {
     stringZones: [],
     gallery: [],
     clientNotes: "",
     maintenanceSchedule: ["Quarterly"],
     ...input,
-    id: uid("p"),
+    id,
   };
-  mutate((s) => {
+  const { error } = await supabase.from("projects").insert({
+    id,
+    client_id: project.clientId,
+    name: project.name,
+    address: project.address,
+    lat: project.lat,
+    lng: project.lng,
+    size_kwp: project.sizeKWp,
+    panel_count: project.panelCount,
+    inverter_brand: project.inverterBrand,
+    inverter_model: project.inverterModel,
+    has_battery: project.hasBattery,
+    battery_system: project.batterySystem ?? null,
+    grid_type: project.gridType,
+    installed_at: project.installedAt,
+    warranty_expiry: project.warrantyExpiry,
+    site_contact_name: project.siteContactName,
+    site_contact_phone: project.siteContactPhone,
+    classification: project.classification,
+    status: project.status,
+    string_zones: project.stringZones,
+    gallery: project.gallery,
+    client_notes: project.clientNotes,
+    maintenance_schedule: project.maintenanceSchedule,
+  });
+  if (error) throw error;
+  await mutate((s) => {
     s.projects.push(project);
-    s.audit.unshift({
-      id: uid(),
-      ts: nowISO(),
-      userId: user.id,
-      userName: user.name,
-      action: "create",
-      target: `Project ${project.name}`,
-    });
+    s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "create", target: `Project ${project.name}` });
   });
   return project;
 }
 
-export function updateProject(id: string, patch: Partial<Project>, user: User) {
-  mutate((s) => {
+export async function updateProject(id: string, patch: Partial<Project>, user: User) {
+  const row: Record<string, unknown> = {};
+  const map: Record<keyof Project, string> = {
+    clientId: "client_id", name: "name", address: "address", lat: "lat", lng: "lng",
+    sizeKWp: "size_kwp", panelCount: "panel_count", inverterBrand: "inverter_brand",
+    inverterModel: "inverter_model", hasBattery: "has_battery", batterySystem: "battery_system",
+    gridType: "grid_type", installedAt: "installed_at", warrantyExpiry: "warranty_expiry",
+    siteContactName: "site_contact_name", siteContactPhone: "site_contact_phone",
+    classification: "classification", status: "status", stringZones: "string_zones",
+    gallery: "gallery", clientNotes: "client_notes", maintenanceSchedule: "maintenance_schedule",
+    id: "id",
+  };
+  for (const [k, v] of Object.entries(patch)) {
+    if (map[k as keyof Project]) row[map[k as keyof Project]] = v as any;
+  }
+  await supabase.from("projects").update(row).eq("id", id);
+  await mutate((s) => {
     const p = s.projects.find((x) => x.id === id);
     if (p) Object.assign(p, patch);
-    s.audit.unshift({
-      id: uid(),
-      ts: nowISO(),
-      userId: user.id,
-      userName: user.name,
-      action: "edit",
-      target: `Project ${id}`,
-    });
+    s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "edit", target: `Project ${id}` });
   });
 }
 
-export function deleteProject(id: string, user: User) {
-  mutate((s) => {
+export async function deleteProject(id: string, user: User) {
+  await supabase.from("projects").delete().eq("id", id);
+  await mutate((s) => {
     s.projects = s.projects.filter((p) => p.id !== id);
     s.visits = s.visits.filter((v) => v.projectId !== id);
     s.inspections = s.inspections.filter((i) => i.projectId !== id);
     s.performance = s.performance.filter((r) => r.projectId !== id);
     s.docs = s.docs.filter((d) => d.projectId !== id);
-    s.audit.unshift({
-      id: uid(),
-      ts: nowISO(),
-      userId: user.id,
-      userName: user.name,
-      action: "delete",
-      target: `Project ${id}`,
-    });
+    s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "delete", target: `Project ${id}` });
   });
 }
 
 /* =================== Module 3: Visits + defects ==================== */
 
-export function addVisit(input: Omit<MaintenanceVisit, "id" | "createdAt">, user: User) {
-  const visit: MaintenanceVisit = { ...input, id: uid("v"), createdAt: nowISO() };
-  mutate((s) => {
-    s.visits.push(visit);
-    s.audit.unshift({
-      id: uid(),
-      ts: nowISO(),
-      userId: user.id,
-      userName: user.name,
-      action: "create",
-      target: `Visit ${visit.date} (${visit.projectId})`,
-    });
+export async function addVisit(input: Omit<MaintenanceVisit, "id" | "createdAt">, user: User) {
+  const { data, error } = await supabase
+    .from("visits")
+    .insert({
+      project_id: input.projectId,
+      date: input.date,
+      technician: input.technician,
+      cleaning_type: input.cleaningType,
+      weather: input.weather,
+      pre_observation: input.preObservation,
+      post_observation: input.postObservation,
+      images: input.images,
+      signature: input.signature,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  // insert nested defects
+  if (input.defects.length) {
+    await supabase.from("defects").insert(
+      input.defects.map((d) => ({
+        visit_id: data.id,
+        category: d.category,
+        description: d.description,
+        status: d.status,
+        opened_at: d.openedAt,
+        resolved_at: d.resolvedAt ?? null,
+      }))
+    );
+  }
+  await mutate((s) => {
+    s.visits.push({ ...input, id: data.id, createdAt: data.created_at });
+    s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "create", target: `Visit ${input.date} (${input.projectId})` });
   });
-  return visit;
+  return getStore().visits.find((v) => v.id === data.id)!;
 }
 
-export function updateVisit(id: string, patch: Partial<MaintenanceVisit>, user: User) {
-  mutate((s) => {
+export async function updateVisit(id: string, patch: Partial<MaintenanceVisit>) {
+  const row: Record<string, unknown> = {};
+  if (patch.date !== undefined) row.date = patch.date;
+  if (patch.technician !== undefined) row.technician = patch.technician;
+  if (patch.cleaningType !== undefined) row.cleaning_type = patch.cleaningType;
+  if (patch.weather !== undefined) row.weather = patch.weather;
+  if (patch.preObservation !== undefined) row.pre_observation = patch.preObservation;
+  if (patch.postObservation !== undefined) row.post_observation = patch.postObservation;
+  if (patch.images !== undefined) row.images = patch.images;
+  if (patch.signature !== undefined) row.signature = patch.signature;
+  await supabase.from("visits").update(row).eq("id", id);
+  await mutate((s) => {
     const v = s.visits.find((x) => x.id === id);
     if (v) Object.assign(v, patch);
   });
@@ -711,29 +793,26 @@ export function visitsFor(projectId: string): MaintenanceVisit[] {
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 }
 
-export function toggleDefect(visitId: string, defectId: string, user: User) {
-  mutate((s) => {
+export async function toggleDefect(visitId: string, defectId: string, user: User) {
+  const visit = getStore().visits.find((v) => v.id === visitId);
+  const defect = visit?.defects.find((d) => d.id === defectId);
+  if (!defect) return;
+  const newStatus = defect.status === "Open" ? "Resolved" : "Open";
+  await supabase
+    .from("defects")
+    .update({ status: newStatus, resolved_at: newStatus === "Resolved" ? nowISO() : null })
+    .eq("id", defectId);
+  await mutate((s) => {
     const v = s.visits.find((x) => x.id === visitId);
     const d = v?.defects.find((x) => x.id === defectId);
     if (d) {
-      d.status = d.status === "Open" ? "Resolved" : "Open";
-      d.resolvedAt = d.status === "Resolved" ? nowISO() : undefined;
+      d.status = newStatus;
+      d.resolvedAt = newStatus === "Resolved" ? nowISO() : undefined;
     }
-    s.audit.unshift({
-      id: uid(),
-      ts: nowISO(),
-      userId: user.id,
-      userName: user.name,
-      action: "edit",
-      target: `Defect ${defectId}`,
-    });
+    s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "edit", target: `Defect ${defectId}` });
   });
 }
 
-/**
- * Days since the last visit. Used to flag overdue maintenance relative
- * to the most frequent scheduled interval.
- */
 export function maintenanceStatus(project: Project): {
   lastVisit?: MaintenanceVisit;
   lastDate?: string;
@@ -761,7 +840,6 @@ export function maintenanceStatus(project: Project): {
   };
 }
 
-/** 0-100 health score: visit recency + open-defect penalty. */
 export function healthScore(project: Project): number {
   const { daysSince, dueDays, overdue } = maintenanceStatus(project);
   const recency = overdue ? Math.max(0, 100 - (daysSince - dueDays)) : 100;
@@ -776,36 +854,101 @@ export function healthScore(project: Project): number {
 
 /* ================ Module 4: Drone inspections ===================== */
 
-export function addInspection(input: Omit<DroneInspection, "id" | "createdAt">, user: User) {
-  const ins: DroneInspection = { ...input, id: uid("ins"), createdAt: nowISO() };
-  mutate((s) => {
-    s.inspections.push(ins);
-    s.audit.unshift({
-      id: uid(),
-      ts: nowISO(),
-      userId: user.id,
-      userName: user.name,
-      action: "upload",
-      target: `Inspection ${ins.date} (${ins.projectId})`,
-    });
+export async function addInspection(input: Omit<DroneInspection, "id" | "createdAt">, user: User) {
+  const { data, error } = await supabase
+    .from("inspections")
+    .insert({
+      project_id: input.projectId,
+      date: input.date,
+      orthomosaic_url: input.orthomosaicUrl ?? null,
+      rgb_url: input.rgbUrl ?? null,
+      thermal_url: input.thermalUrl ?? null,
+      report_pdf_url: input.reportPdfUrl ?? null,
+      processed_images: input.processedImages,
+      layout_url: input.layoutUrl ?? null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  if (input.anomalies.length) {
+    await supabase.from("anomalies").insert(
+      input.anomalies.map((a) => ({
+        inspection_id: data.id,
+        panel_id: a.panelId,
+        type: a.type,
+        severity: a.severity,
+        status: a.status,
+        detected_at: a.detectedAt,
+        resolved_at: a.resolvedAt ?? null,
+        x: a.x ?? null,
+        y: a.y ?? null,
+        note: a.note ?? null,
+      }))
+    );
+  }
+  await mutate((s) => {
+    s.inspections.push({ ...input, id: data.id, createdAt: data.created_at });
+    s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "upload", target: `Inspection ${input.date} (${input.projectId})` });
   });
-  return ins;
+  return getStore().inspections.find((i) => i.id === data.id)!;
 }
 
-export function updateInspection(id: string, patch: Partial<DroneInspection>, user: User) {
-  mutate((s) => {
+export async function updateInspection(id: string, patch: Partial<DroneInspection>) {
+  const row: Record<string, unknown> = {};
+  if (patch.date !== undefined) row.date = patch.date;
+  if (patch.orthomosaicUrl !== undefined) row.orthomosaic_url = patch.orthomosaicUrl;
+  if (patch.rgbUrl !== undefined) row.rgb_url = patch.rgbUrl;
+  if (patch.thermalUrl !== undefined) row.thermal_url = patch.thermalUrl;
+  if (patch.reportPdfUrl !== undefined) row.report_pdf_url = patch.reportPdfUrl;
+  if (patch.processedImages !== undefined) row.processed_images = patch.processedImages;
+  if (patch.layoutUrl !== undefined) row.layout_url = patch.layoutUrl;
+  await supabase.from("inspections").update(row).eq("id", id);
+  await mutate((s) => {
     const i = s.inspections.find((x) => x.id === id);
     if (i) Object.assign(i, patch);
   });
 }
 
-export function toggleAnomaly(inspectionId: string, anomalyId: string, user: User) {
-  mutate((s) => {
+/** Add a single anomaly to an inspection (separate table). */
+export async function addAnomaly(inspectionId: string, anomaly: Omit<Anomaly, "id">) {
+  const { data, error } = await supabase
+    .from("anomalies")
+    .insert({
+      inspection_id: inspectionId,
+      panel_id: anomaly.panelId,
+      type: anomaly.type,
+      severity: anomaly.severity,
+      status: anomaly.status,
+      detected_at: anomaly.detectedAt,
+      resolved_at: anomaly.resolvedAt ?? null,
+      x: anomaly.x ?? null,
+      y: anomaly.y ?? null,
+      note: anomaly.note ?? null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  await mutate((s) => {
     const ins = s.inspections.find((x) => x.id === inspectionId);
-    const a = ins?.anomalies.find((x) => x.id === anomalyId);
+    if (ins) ins.anomalies.push({ ...anomaly, id: data.id });
+  });
+}
+
+export async function toggleAnomaly(inspectionId: string, anomalyId: string) {
+  const ins = getStore().inspections.find((i) => i.id === inspectionId);
+  const anomaly = ins?.anomalies.find((a) => a.id === anomalyId);
+  if (!anomaly) return;
+  const newStatus = anomaly.status === "Open" ? "Resolved" : "Open";
+  await supabase
+    .from("anomalies")
+    .update({ status: newStatus, resolved_at: newStatus === "Resolved" ? nowISO() : null })
+    .eq("id", anomalyId);
+  await mutate((s) => {
+    const ins2 = s.inspections.find((x) => x.id === inspectionId);
+    const a = ins2?.anomalies.find((x) => x.id === anomalyId);
     if (a) {
-      a.status = a.status === "Open" ? "Resolved" : "Open";
-      a.resolvedAt = a.status === "Resolved" ? nowISO() : undefined;
+      a.status = newStatus;
+      a.resolvedAt = newStatus === "Resolved" ? nowISO() : undefined;
     }
   });
 }
@@ -816,7 +959,6 @@ export function inspectionsFor(projectId: string): DroneInspection[] {
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 }
 
-/** Anomalies that were Open in an earlier inspection and are still Open now. */
 export function persistentAnomalies(projectId: string) {
   const ins = inspectionsFor(projectId);
   const openNow = new Set(
@@ -832,25 +974,17 @@ export function persistentAnomalies(projectId: string) {
 
 /* ================ Module 5: Performance =========================== */
 
-export function addPerformance(projectId: string, date: string, energyKWh: number, user: User) {
+export async function addPerformance(projectId: string, date: string, energyKWh: number, user: User) {
   const project = getProject(projectId);
   const expected = project ? +(project.sizeKWp * 4.6).toFixed(1) : energyKWh;
-  mutate((s) => {
-    s.performance.push({
-      id: uid("perf"),
-      projectId,
-      date,
-      energyKWh,
-      expectedKWh: expected,
-    });
-    s.audit.unshift({
-      id: uid(),
-      ts: nowISO(),
-      userId: user.id,
-      userName: user.name,
-      action: "upload",
-      target: `Performance ${date} (${projectId})`,
-    });
+  const { error } = await supabase.from("performance").upsert(
+    { project_id: projectId, date, energy_kwh: energyKWh, expected_kwh: expected },
+    { onConflict: "project_id,date" }
+  );
+  if (error) throw error;
+  await mutate((s) => {
+    s.performance.push({ id: uid("perf"), projectId, date, energyKWh, expectedKWh: expected });
+    s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "upload", target: `Performance ${date} (${projectId})` });
   });
 }
 
@@ -860,7 +994,6 @@ export function performanceFor(projectId: string): PerformanceRecord[] {
     .sort((a, b) => (a.date < b.date ? -1 : 1));
 }
 
-/** Performance Ratio (%) averaged over the period. */
 export function performanceRatio(projectId: string): number {
   const recs = performanceFor(projectId);
   if (!recs.length) return 0;
@@ -868,13 +1001,11 @@ export function performanceRatio(projectId: string): number {
   return Math.round(pr * 10) / 10;
 }
 
-/** CO2 offset in kg from total generation (1 kWh ≈ 0.42 kg CO2 averted). */
 export function co2OffsetKg(projectId: string): number {
   const total = performanceFor(projectId).reduce((s, r) => s + r.energyKWh, 0);
   return Math.round(total * 0.42);
 }
 
-/** Parse simple `date,energy` CSV into records. */
 export function parsePerformanceCsv(text: string): { date: string; energyKWh: number }[] {
   const lines = text.trim().split(/\r?\n/);
   const out: { date: string; energyKWh: number }[] = [];
@@ -891,33 +1022,31 @@ export function parsePerformanceCsv(text: string): { date: string; energyKWh: nu
 
 /* ================ Module 6: Documents + audit ===================== */
 
-export function addDoc(input: Omit<VaultDoc, "id" | "uploadedAt">, user: User) {
-  const doc: VaultDoc = { ...input, id: uid(), uploadedAt: nowISO() };
-  mutate((s) => {
-    s.docs.push(doc);
-    s.audit.unshift({
-      id: uid(),
-      ts: nowISO(),
-      userId: user.id,
-      userName: user.name,
-      action: "upload",
-      target: `Doc ${doc.name}`,
-    });
+export async function addDoc(input: Omit<VaultDoc, "id" | "uploadedAt">, user: User) {
+  const { data, error } = await supabase
+    .from("docs")
+    .insert({
+      project_id: input.projectId,
+      name: input.name,
+      type: input.type,
+      url: input.url,
+      uploaded_by: input.uploadedBy,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  await mutate((s) => {
+    s.docs.push({ ...input, id: data.id, uploadedAt: data.uploaded_at });
+    s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "upload", target: `Doc ${input.name}` });
   });
-  return doc;
+  return getStore().docs.find((d) => d.id === data.id)!;
 }
 
-export function deleteDoc(id: string, user: User) {
-  mutate((s) => {
+export async function deleteDoc(id: string, user: User) {
+  await supabase.from("docs").delete().eq("id", id);
+  await mutate((s) => {
     s.docs = s.docs.filter((d) => d.id !== id);
-    s.audit.unshift({
-      id: uid(),
-      ts: nowISO(),
-      userId: user.id,
-      userName: user.name,
-      action: "delete",
-      target: `Doc ${id}`,
-    });
+    s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "delete", target: `Doc ${id}` });
   });
 }
 
@@ -926,5 +1055,3 @@ export function docsFor(projectId: string): VaultDoc[] {
     .docs.filter((d) => d.projectId === projectId)
     .sort((a, b) => (a.uploadedAt < b.uploadedAt ? 1 : -1));
 }
-
-export { uid, nowISO };

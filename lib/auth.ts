@@ -1,14 +1,19 @@
 /**
- * Client-side auth for the Datafy portals.
+ * lib/auth.ts — Hybrid auth for the Datafy portals.
  *
- * Supports two portals:
+ * Two portals share this layer:
  *  - D³ dashboard (/d3)        — legacy single-user demo dashboard
  *  - O&M portal  (/portal)     — role-based (super_admin / field_engineer / client)
  *
- * Auth is client-side/demo: credentials live in-memory and the session is
- * persisted in localStorage. The contract is backend-agnostic so a real
- * service can be swapped in without touching the UI.
+ * Tries Supabase first; falls back to in-memory demo credentials when Supabase
+ * is unavailable or users have not been seeded yet.
  */
+
+import { supabase } from "@/lib/supabase/browser";
+
+const SESSION_KEY = "d3_session";
+const PORTAL_SESSION_KEY = "om_session";
+const STORED_USERS_KEY = "om_stored_users";
 
 export type Role = "super_admin" | "field_engineer" | "client";
 export type ClientSubRole = "client_admin" | "client_viewer";
@@ -17,6 +22,7 @@ export type User = {
   id: string;
   name: string;
   email: string;
+  /** Kept on the type for compatibility; always empty under Supabase. */
   password: string;
   role: Role;
   company?: string;
@@ -30,28 +36,63 @@ export type User = {
   lastLogin?: string | null;
 };
 
-const SESSION_KEY = "d3_session";
-const PORTAL_SESSION_KEY = "om_session";
-const STORED_USERS_KEY = "om_stored_users";
+/** Row shape in the public.profiles table (snake_case columns). */
+type ProfileRow = {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  company: string | null;
+  title: string | null;
+  client_id: string | null;
+  client_sub_role: ClientSubRole | null;
+  restricted_project_id: string | null;
+  last_login: string | null;
+};
+
+function toUser(p: ProfileRow): User {
+  return {
+    id: p.id,
+    name: p.name,
+    email: p.email,
+    password: "",
+    role: p.role,
+    company: p.company ?? undefined,
+    title: p.title ?? undefined,
+    clientId: p.client_id ?? undefined,
+    clientSubRole: p.client_sub_role ?? undefined,
+    restrictedProjectId: p.restricted_project_id ?? undefined,
+    lastLogin: p.last_login,
+  };
+}
 
 /* ------------------------------------------------------------------ */
-/*  Credentials                                                        */
+/*  Demo credential display (login screens show these as hints)        */
 /* ------------------------------------------------------------------ */
 
-/**
- * D³ dashboard users (legacy /d3 portal). Kept for backward compatibility.
- */
-export const users: Record<string, { password: string; user: User }> = {
+export const DEMO_CREDENTIALS = [
+  { loginId: "admin@datafy.com", password: "Datafy#2026" },
+  { loginId: "engineer@datafy.com", password: "Solar#2026" },
+];
+
+export const OM_DEMO_CREDENTIALS = [
+  { loginId: "admin@datafy.com", password: "Datafy#2026", role: "Super Admin" },
+  { loginId: "engineer@datafy.com", password: "Solar#2026", role: "Field Engineer" },
+  { loginId: "client@nestle.com", password: "Nestle#2026", role: "Client Admin" },
+  { loginId: "viewer@jzs.com", password: "Jzs#2026", role: "Client Viewer" },
+];
+
+const d3Users: Record<string, { password: string; user: User }> = {
   "admin@datafy.com": {
-    password: "Datafy@123",
+    password: "Datafy#2026",
     user: {
       id: "u-001",
       name: "Badar Munir",
       email: "admin@datafy.com",
-      password: "Datafy@123",
+      password: "Datafy#2026",
       role: "super_admin",
-      company: "Quaid-e-Azam Solar Power",
-      title: "Plant Manager",
+      company: "Datafy Associate",
+      title: "Super Admin",
       lastLogin: null,
     },
   },
@@ -70,17 +111,12 @@ export const users: Record<string, { password: string; user: User }> = {
   },
 };
 
-/**
- * O&M portal credentials. Roles: super_admin, field_engineer, client.
- * Client users carry a clientId + sub-role so the portal can restrict
- * their view to their own projects.
- */
-export const omUsers: Record<string, User> = {
+const omUsers: Record<string, User> = {
   "admin@datafy.com": {
     id: "om-admin",
     name: "Badar Munir",
     email: "admin@datafy.com",
-    password: "Datafy@123",
+    password: "Datafy#2026",
     role: "super_admin",
     company: "Datafy Associate",
     title: "Super Admin",
@@ -123,22 +159,6 @@ export const omUsers: Record<string, User> = {
   },
 };
 
-export const OM_DEMO_CREDENTIALS = [
-  { loginId: "admin@datafy.com", password: "Datafy@123", role: "Super Admin" },
-  { loginId: "engineer@datafy.com", password: "Solar#2026", role: "Field Engineer" },
-  { loginId: "client@nestle.com", password: "Nestle#2026", role: "Client Admin" },
-  { loginId: "viewer@jzs.com", password: "Jzs#2026", role: "Client Viewer" },
-];
-
-export const DEMO_CREDENTIALS = [
-  { loginId: "admin@datafy.com", password: "Datafy@123" },
-  { loginId: "engineer@datafy.com", password: "Solar#2026" },
-];
-
-/* ------------------------------------------------------------------ */
-/*  Session helpers (shared)                                          */
-/* ------------------------------------------------------------------ */
-
 function readSession(key: string): User | null {
   if (typeof window === "undefined") return null;
   try {
@@ -155,64 +175,20 @@ function writeSession(key: string, user: User) {
   }
 }
 
-/* ------------------------------------------------------------------ */
-/*  D³ dashboard auth (legacy)                                        */
-/* ------------------------------------------------------------------ */
-
-export function login(loginId: string, password: string): User | null {
-  const entry = users[loginId.trim().toLowerCase()];
-  if (!entry || entry.password !== password) return null;
-  const user = entry.user;
-  user.lastLogin = new Date().toISOString();
-  writeSession(SESSION_KEY, user);
-  return user;
-}
-
-export function logout(): void {
+function clearSession(key: string) {
   if (typeof window !== "undefined") {
-    window.localStorage.removeItem(SESSION_KEY);
+    window.localStorage.removeItem(key);
   }
 }
 
-export function getSession(): User | null {
-  return readSession(SESSION_KEY);
-}
-
-/* ------------------------------------------------------------------ */
-/*  O&M portal auth                                                   */
-/* ------------------------------------------------------------------ */
-
-export function omLogin(loginId: string, password: string): User | null {
-  const user = omUsers[loginId.trim().toLowerCase()];
-  if (!user || user.password !== password) return null;
-  user.lastLogin = new Date().toISOString();
-  writeSession(PORTAL_SESSION_KEY, user);
-  return user;
-}
-
-export function omLogout(): void {
-  if (typeof window !== "undefined") {
-    window.localStorage.removeItem(PORTAL_SESSION_KEY);
-  }
-}
-
-export function getOmSession(): User | null {
-  return readSession(PORTAL_SESSION_KEY);
-}
-
-/**
- * Load any previously stored O&M users from localStorage so they survive
- * page refreshes.
- */
 function loadStoredOmUsers() {
-  if (typeof window === "undefined" || typeof localStorage === "undefined") return;
+  if (typeof window === "undefined") return;
   try {
     const raw = localStorage.getItem(STORED_USERS_KEY);
-    if (raw) {
-      const stored = JSON.parse(raw) as Record<string, User>;
-      for (const [key, u] of Object.entries(stored)) {
-        omUsers[key] = u;
-      }
+    if (!raw) return;
+    const stored = JSON.parse(raw) as Record<string, User>;
+    for (const [key, user] of Object.entries(stored)) {
+      omUsers[key] = user;
     }
   } catch {
     // ignore corrupt data
@@ -220,20 +196,12 @@ function loadStoredOmUsers() {
 }
 
 function persistOmUsers() {
-  if (typeof window === "undefined" || typeof localStorage === "undefined") return;
+  if (typeof window === "undefined") return;
   try {
-    // Only persist dynamically-created users (those not in the hardcoded defaults).
-    const defaults = new Set([
-      "admin@datafy.com",
-      "engineer@datafy.com",
-      "client@nestle.com",
-      "viewer@jzs.com",
-    ]);
+    const defaults = new Set(OM_DEMO_CREDENTIALS.map((c) => c.loginId));
     const stored: Record<string, User> = {};
-    for (const [key, u] of Object.entries(omUsers)) {
-      if (!defaults.has(key)) {
-        stored[key] = u;
-      }
+    for (const [key, user] of Object.entries(omUsers)) {
+      if (!defaults.has(key)) stored[key] = user;
     }
     localStorage.setItem(STORED_USERS_KEY, JSON.stringify(stored));
   } catch {
@@ -241,26 +209,173 @@ function persistOmUsers() {
   }
 }
 
-// Hydrate runtime users from localStorage on module load.
 loadStoredOmUsers();
 
-/**
- * Register a new O&M portal user at runtime (used when onboarding clients).
- * Adds the user to the in-memory omUsers record and persists it so the
- * credential survives a page refresh.
- */
-export function addOmUser(input: {
+function demoLogin(loginId: string, password: string, sessionKey: string): User | null {
+  const email = loginId.trim().toLowerCase();
+  const entry = d3Users[email];
+  if (!entry || entry.password !== password) return null;
+  const user = { ...entry.user, lastLogin: new Date().toISOString() };
+  writeSession(sessionKey, user);
+  return user;
+}
+
+function demoOmLogin(loginId: string, password: string): User | null {
+  const email = loginId.trim().toLowerCase();
+  const user = omUsers[email];
+  if (!user || user.password !== password) return null;
+  const sessionUser = { ...user, lastLogin: new Date().toISOString() };
+  writeSession(PORTAL_SESSION_KEY, sessionUser);
+  return sessionUser;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Fetch the profile row for a given auth uid.                        */
+/* ------------------------------------------------------------------ */
+
+async function fetchProfile(uid: string): Promise<User | null> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", uid)
+    .maybeSingle();
+  if (error || !data) return null;
+  return toUser(data as ProfileRow);
+}
+
+/** Stamp last_login on the profile row. Best-effort; ignored on failure. */
+async function stampLogin(uid: string) {
+  await supabase
+    .from("profiles")
+    .update({ last_login: new Date().toISOString() })
+    .eq("id", uid);
+}
+
+/* ------------------------------------------------------------------ */
+/*  D³ dashboard auth (legacy /d3 portal)                              */
+/*  Note: both portals accept the same credentials; only the redirect  */
+/*  target differs, so we keep the original two entry points.          */
+/* ------------------------------------------------------------------ */
+
+export async function login(loginId: string, password: string): Promise<User | null> {
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: loginId.trim().toLowerCase(),
+      password,
+    });
+    if (!error && data.user) {
+      clearSession(SESSION_KEY);
+      await stampLogin(data.user.id);
+      const profile = await fetchProfile(data.user.id);
+      if (profile) return profile;
+    }
+  } catch {
+    // Supabase unavailable — fall through to demo auth.
+  }
+  return demoLogin(loginId, password, SESSION_KEY);
+}
+
+export async function logout(): Promise<void> {
+  clearSession(SESSION_KEY);
+  try {
+    await supabase.auth.signOut();
+  } catch {
+    // ignore
+  }
+}
+
+export async function getSession(): Promise<User | null> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const uid = data.session?.user.id;
+    if (uid) {
+      const profile = await fetchProfile(uid);
+      if (profile) return profile;
+    }
+  } catch {
+    // Supabase unavailable — fall through to demo session.
+  }
+  return readSession(SESSION_KEY);
+}
+
+/* ------------------------------------------------------------------ */
+/*  O&M portal auth                                                    */
+/* ------------------------------------------------------------------ */
+
+export async function omLogin(loginId: string, password: string): Promise<User | null> {
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: loginId.trim().toLowerCase(),
+      password,
+    });
+    if (!error && data.user) {
+      clearSession(PORTAL_SESSION_KEY);
+      await stampLogin(data.user.id);
+      const profile = await fetchProfile(data.user.id);
+      if (profile) return profile;
+    }
+  } catch {
+    // Supabase unavailable — fall through to demo auth.
+  }
+  return demoOmLogin(loginId, password);
+}
+
+export async function omLogout(): Promise<void> {
+  clearSession(PORTAL_SESSION_KEY);
+  try {
+    await supabase.auth.signOut();
+  } catch {
+    // ignore
+  }
+}
+
+export async function getOmSession(): Promise<User | null> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const uid = data.session?.user.id;
+    if (uid) {
+      const profile = await fetchProfile(uid);
+      if (profile) return profile;
+    }
+  } catch {
+    // Supabase unavailable — fall through to demo session.
+  }
+  return readSession(PORTAL_SESSION_KEY);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Onboarding a new client user (used by ClientsView).                */
+/*  Creates an auth user via the service-role key through a route,     */
+/*  then inserts the profile. Client components can't use the service  */
+/*  key directly, so this calls /api/om/create-user.                   */
+/* ------------------------------------------------------------------ */
+
+export async function addOmUser(input: {
   name: string;
   email: string;
   password: string;
   company: string;
   clientId: string;
   clientSubRole?: ClientSubRole;
-}): User {
+}): Promise<User | null> {
+  try {
+    const res = await fetch("/api/om/create-user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (res.ok) {
+      const { user } = await res.json();
+      return user as User;
+    }
+  } catch {
+    // API unavailable — fall through to local demo user store.
+  }
+
   const user: User = {
     id: `om-user-${Date.now()}`,
     name: input.name,
-    email: input.email,
+    email: input.email.trim().toLowerCase(),
     password: input.password,
     role: "client",
     company: input.company,
@@ -268,9 +383,24 @@ export function addOmUser(input: {
     clientSubRole: input.clientSubRole ?? "client_admin",
     lastLogin: null,
   };
-  omUsers[input.email.toLowerCase()] = user;
+  omUsers[user.email] = user;
   persistOmUsers();
   return user;
+}
+
+/**
+ * @deprecated Kept only for backward-compat with older imports.
+ * Under Supabase, users live in the database — call fetchProfiles() instead.
+ */
+export async function fetchProfiles(): Promise<User[]> {
+  const { data, error } = await supabase.from("profiles").select("*");
+  if (error || !data) return [];
+  return (data as ProfileRow[]).map(toUser);
+}
+
+/** Demo/local users linked to a client (used when Supabase profiles are unavailable). */
+export function getOmUsersForClient(clientId: string): User[] {
+  return Object.values(omUsers).filter((u) => u.clientId === clientId);
 }
 
 /** Permission helpers used across the portal. */

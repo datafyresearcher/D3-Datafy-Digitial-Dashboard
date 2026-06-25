@@ -19,9 +19,7 @@ export default function LoginClient() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    // brief delay so the loading state is perceptible
-    await new Promise((r) => setTimeout(r, 400));
-    const user = login(loginId, password);
+    const user = await login(loginId, password);
     setLoading(false);
     if (!user) {
       setError("Invalid login ID or password. Please try again.");

@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import {
   Crosshair,
   Eye,
@@ -16,9 +16,34 @@ import type { User } from "@/lib/auth";
 import type { Store, Project } from "@/lib/om";
 import { visibleProjects } from "@/lib/om";
 
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
-const MAPBOX_HYBRID_STYLE = "mapbox://styles/mapbox/satellite-streets-v12";
-const MAPBOX_DEM_SOURCE_ID = "mapbox-dem";
+/** Free hybrid satellite + street labels (no Mapbox token required). */
+const HYBRID_MAP_STYLE: maplibregl.StyleSpecification = {
+  version: 8,
+  sources: {
+    satellite: {
+      type: "raster",
+      tiles: [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+      attribution: "Tiles © Esri",
+    },
+    labels: {
+      type: "raster",
+      tiles: [
+        "https://a.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png",
+        "https://b.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png",
+        "https://c.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png",
+        "https://d.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png",
+      ],
+      tileSize: 256,
+    },
+  },
+  layers: [
+    { id: "satellite", type: "raster", source: "satellite" },
+    { id: "labels", type: "raster", source: "labels" },
+  ],
+};
 const GLOBE_CAMERA = {
   center: [72.9, 32.9] as [number, number],
   zoom: 2.45,
@@ -101,7 +126,7 @@ function escapeHtml(value: unknown): string {
     .replace(/'/g, "&#039;");
 }
 
-function getResponsivePadding(): mapboxgl.PaddingOptions {
+function getResponsivePadding(): maplibregl.PaddingOptions {
   if (typeof window === "undefined") return { top: 92, right: 92, bottom: 88, left: 352 };
   const isMobile = window.innerWidth < 768;
   return isMobile
@@ -128,8 +153,8 @@ function getBoundaryForProject(project: Project, clientName?: string): SiteBound
   );
 }
 
-function getBoundaryBounds(boundary: SiteBoundary): mapboxgl.LngLatBounds {
-  const bounds = new mapboxgl.LngLatBounds();
+function getBoundaryBounds(boundary: SiteBoundary): maplibregl.LngLatBounds {
+  const bounds = new maplibregl.LngLatBounds();
   boundary.coordinates.forEach((coordinate) => bounds.extend(coordinate));
   return bounds;
 }
@@ -145,9 +170,9 @@ function getProjectCenter(project: Project, clientName?: string): [number, numbe
   return boundary ? getBoundaryCenter(boundary) : [project.lng, project.lat];
 }
 
-function projectBounds(projects: Project[], clientById: Map<string, string>): mapboxgl.LngLatBounds | null {
+function projectBounds(projects: Project[], clientById: Map<string, string>): maplibregl.LngLatBounds | null {
   if (!projects.length) return null;
-  const bounds = new mapboxgl.LngLatBounds();
+  const bounds = new maplibregl.LngLatBounds();
   projects.forEach((project) => {
     const boundary = getBoundaryForProject(project, clientById.get(project.clientId));
     if (boundary) {
@@ -167,8 +192,8 @@ export default function SiteLocationsView({
   store: Store;
 }) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const markerRefs = useRef<Record<string, mapboxgl.Marker>>({});
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const markerRefs = useRef<Record<string, maplibregl.Marker>>({});
   const introTimeoutRef = useRef<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -230,7 +255,7 @@ export default function SiteLocationsView({
     if (!map) return;
 
     try {
-      map.setProjection({ name: "globe" });
+      map.setProjection({ type: "globe" });
     } catch {
       // Unsupported projection renderers keep the current camera.
     }
@@ -389,55 +414,33 @@ export default function SiteLocationsView({
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current || projects.length === 0) return;
 
-    mapboxgl.accessToken = MAPBOX_TOKEN;
-
-    const map = new mapboxgl.Map({
+    const map = new maplibregl.Map({
       container: mapContainerRef.current,
-      style: MAPBOX_HYBRID_STYLE,
+      style: HYBRID_MAP_STYLE,
       center: GLOBE_CAMERA.center,
       zoom: GLOBE_CAMERA.zoom,
       pitch: GLOBE_CAMERA.pitch,
       bearing: GLOBE_CAMERA.bearing,
-      projection: { name: "globe" },
-      antialias: true,
     });
 
     mapRef.current = map;
-    map.addControl(new mapboxgl.NavigationControl(), "top-right");
-    map.addControl(new mapboxgl.ScaleControl({ maxWidth: 140, unit: "metric" }), "bottom-right");
+    map.addControl(new maplibregl.NavigationControl(), "top-right");
+    map.addControl(new maplibregl.ScaleControl({ maxWidth: 140, unit: "metric" }), "bottom-right");
     const loadingFallback = window.setTimeout(() => setLoading(false), 9000);
 
-    map.once("style.load", () => {
+    map.once("load", () => {
       try {
-        map.setProjection({ name: "globe" });
-      } catch {
-        // Globe projection is unavailable on some renderers.
-      }
-
-      try {
-        if (!map.getSource(MAPBOX_DEM_SOURCE_ID)) {
-          map.addSource(MAPBOX_DEM_SOURCE_ID, {
-            type: "raster-dem",
-            url: "mapbox://mapbox.mapbox-terrain-dem-v1",
-            tileSize: 512,
-            maxzoom: 14,
-          });
-        }
-        map.setTerrain({ source: MAPBOX_DEM_SOURCE_ID, exaggeration: 1.2 });
-      } catch {
-        // Terrain is decorative; the site points still work without it.
-      }
-
-      try {
-        map.setFog({
-          color: "rgb(186, 210, 235)",
-          "high-color": "rgb(36, 92, 223)",
-          "horizon-blend": 0.02,
-          "space-color": "rgb(11, 11, 25)",
-          "star-intensity": 0.5,
+        map.setProjection({ type: "globe" });
+        map.setSky({
+          "sky-color": "#bae2eb",
+          "sky-horizon-blend": 0.4,
+          "horizon-color": "#245cdf",
+          "horizon-fog-blend": 0.02,
+          "fog-color": "#0b0b19",
+          "fog-ground-blend": 0.5,
         });
       } catch {
-        // Fog is decorative; keep rendering the map.
+        // Globe/sky is decorative; the site points still work without it.
       }
 
       projects.forEach((project) => {
@@ -498,7 +501,7 @@ export default function SiteLocationsView({
         el.innerHTML = `<span>${escapeHtml(project.name)}</span>`;
         el.addEventListener("click", () => focusProject(project));
 
-        const popup = new mapboxgl.Popup({
+        const popup = new maplibregl.Popup({
           closeButton: true,
           closeOnMove: false,
           maxWidth: "320px",
@@ -515,7 +518,7 @@ export default function SiteLocationsView({
           </div>
         `);
 
-        markerRefs.current[project.id] = new mapboxgl.Marker({ element: el, anchor: "center" })
+        markerRefs.current[project.id] = new maplibregl.Marker({ element: el, anchor: "center" })
           .setLngLat(markerCoordinate)
           .setPopup(popup)
           .addTo(map);
@@ -527,7 +530,7 @@ export default function SiteLocationsView({
     });
 
     map.on("error", (event) => {
-      console.error("Mapbox GL error:", event.error);
+      console.error("MapLibre error:", event.error);
     });
 
     return () => {
@@ -584,7 +587,7 @@ export default function SiteLocationsView({
             height: 100%;
           }
 
-          .om-geospatial-container .mapboxgl-map {
+          .om-geospatial-container .maplibregl-map {
             width: 100% !important;
             height: 100% !important;
             font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getOmSession, type User } from "@/lib/auth";
+import { supabase } from "@/lib/supabase/browser";
 import { Loader2 } from "lucide-react";
 
 /** Role-aware guard for the O&M portal. */
@@ -17,13 +18,29 @@ export default function OmAuthGuard({
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const user = getOmSession();
-    if (!user) {
-      router.replace("/portal/login");
-      return;
-    }
-    onUser(user);
-    setReady(true);
+    let active = true;
+    // Resolve once on mount, then react to sign-in/out events.
+    const init = async () => {
+      const user = await getOmSession();
+      if (!active) return;
+      if (!user) {
+        router.replace("/portal/login");
+        return;
+      }
+      onUser(user);
+      setReady(true);
+    };
+    init();
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) return;
+      const user = await getOmSession();
+      if (!user) router.replace("/portal/login");
+    });
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
   }, [router, onUser]);
 
   if (!ready) {

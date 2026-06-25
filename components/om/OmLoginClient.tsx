@@ -26,8 +26,7 @@ export default function OmLoginClient() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 400));
-    const user = omLogin(loginId, password);
+    const user = await omLogin(loginId, password);
     setLoading(false);
     if (!user) {
       setError("Invalid credentials. Try a demo account below.");

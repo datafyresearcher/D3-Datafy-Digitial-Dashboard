@@ -1,0 +1,248 @@
+import type { PerformanceRecord, Store } from "./om";
+
+export function seedStore(uid: (prefix?: string) => string): Store {
+  return {
+    clients: [
+      {
+        id: "c-nestle",
+        company: "Nestlé Pakistan",
+        contactName: "Ahsan Khan",
+        email: "client@nestle.com",
+        phone: "+92 300 1234567",
+        billingTier: "Enterprise",
+        status: "Active",
+        createdAt: "2021-03-01T00:00:00Z",
+        activity: [
+          { id: uid(), ts: "2026-06-20T08:14:00Z", type: "login", detail: "Logged in" },
+          { id: uid(), ts: "2026-06-18T11:02:00Z", type: "download", detail: "Downloaded performance report" },
+        ],
+      },
+      {
+        id: "c-jzs",
+        company: "JZS Farm",
+        contactName: "Imran Yousuf",
+        email: "viewer@jzs.com",
+        phone: "+92 321 7654321",
+        billingTier: "Pro",
+        status: "Active",
+        createdAt: "2019-08-15T00:00:00Z",
+        activity: [
+          { id: uid(), ts: "2026-06-22T07:30:00Z", type: "login", detail: "Logged in" },
+          { id: uid(), ts: "2026-06-15T09:45:00Z", type: "view", detail: "Viewed drone inspection" },
+        ],
+      },
+      {
+        id: "c-qa",
+        company: "Quaid-e-Azam Solar Power",
+        contactName: "Bilal Ahmed",
+        email: "bilal@qasp.com.pk",
+        phone: "+92 333 9876543",
+        billingTier: "Enterprise",
+        status: "Active",
+        createdAt: "2015-05-01T00:00:00Z",
+        activity: [
+          { id: uid(), ts: "2026-06-21T13:20:00Z", type: "login", detail: "Logged in" },
+        ],
+      },
+    ],
+    projects: [
+      {
+        id: "p-nestle-1",
+        clientId: "c-nestle",
+        name: "Nestlé Sheikhupura Rooftop",
+        address: "Ferozewala, Sheikhupura, Punjab",
+        lat: 31.516,
+        lng: 74.0167,
+        sizeKWp: 450,
+        panelCount: 11250,
+        inverterBrand: "Huawei",
+        inverterModel: "SUN2000-100KTL",
+        hasBattery: false,
+        gridType: "On-grid",
+        installedAt: "2021-03-15",
+        warrantyExpiry: "2031-03-15",
+        siteContactName: "Tariq Mehmood",
+        siteContactPhone: "+92 300 5551122",
+        classification: "Industrial",
+        status: "Active",
+        stringZones: [
+          { id: uid(), name: "String 1-12", panelCount: 1320, location: "Roof block A" },
+          { id: uid(), name: "String 13-24", panelCount: 1320, location: "Roof block B" },
+        ],
+        gallery: [],
+        clientNotes: "Quarterly performance review scheduled with sustainability team.",
+        maintenanceSchedule: ["Quarterly"],
+      },
+      {
+        id: "p-jzs-1",
+        clientId: "c-jzs",
+        name: "JZS Sahiwal Ground-Mount",
+        address: "Sahiwal, Punjab",
+        lat: 30.6662,
+        lng: 73.0223,
+        sizeKWp: 20,
+        panelCount: 8224,
+        inverterBrand: "Sungrow",
+        inverterModel: "SG250HX",
+        hasBattery: true,
+        batterySystem: "Tesla Powerpack 200 kWh",
+        gridType: "Hybrid",
+        installedAt: "2019-08-20",
+        warrantyExpiry: "2029-08-20",
+        siteContactName: "Imran Yousuf",
+        siteContactPhone: "+92 321 7654321",
+        classification: "Commercial",
+        status: "Active",
+        stringZones: [
+          { id: uid(), name: "Zone A", panelCount: 4112, location: "North array" },
+          { id: uid(), name: "Zone B", panelCount: 4112, location: "South array" },
+        ],
+        gallery: [],
+        clientNotes: "Bird-deterrent netting installed in Zone B (May 2026).",
+        maintenanceSchedule: ["Monthly"],
+      },
+      {
+        id: "p-qa-1",
+        clientId: "c-qa",
+        name: "QASP Phase-I 100MW",
+        address: "Lal Suhanra, Bahawalpur",
+        lat: 29.3858,
+        lng: 71.6908,
+        sizeKWp: 100000,
+        panelCount: 411200,
+        inverterBrand: "Sungrow",
+        inverterModel: "SG2500HV",
+        hasBattery: false,
+        gridType: "On-grid",
+        installedAt: "2015-05-01",
+        warrantyExpiry: "2025-05-01",
+        siteContactName: "Bilal Ahmed",
+        siteContactPhone: "+92 333 9876543",
+        classification: "Industrial",
+        status: "Under Maintenance",
+        stringZones: [
+          { id: uid(), name: "Block A", panelCount: 102800, location: "West field" },
+          { id: uid(), name: "Block B", panelCount: 102800, location: "East field" },
+        ],
+        gallery: [],
+        clientNotes: "Inverter firmware upgrade underway for Block A.",
+        maintenanceSchedule: ["Monthly", "Half-yearly"],
+      },
+    ],
+    visits: [
+      {
+        id: uid("v"),
+        projectId: "p-nestle-1",
+        date: "2026-05-12",
+        technician: "Shahzad Hassan",
+        cleaningType: "Wet cleaning",
+        weather: "Sunny",
+        preObservation: "Moderate dust accumulation observed on block A.",
+        postObservation: "All panels cleaned. Post-clean IR readings nominal.",
+        images: [],
+        defects: [
+          {
+            id: uid(),
+            category: "Soiling",
+            description: "Heavy soiling on panel A-204",
+            status: "Resolved",
+            openedAt: "2026-05-12T09:00:00Z",
+            resolvedAt: "2026-05-12T11:30:00Z",
+          },
+        ],
+        signature: "Shahzad Hassan",
+        createdAt: "2026-05-12T08:00:00Z",
+      },
+    ],
+    inspections: [
+      {
+        id: uid("ins"),
+        projectId: "p-nestle-1",
+        date: "2026-04-10",
+        processedImages: [],
+        anomalies: [
+          {
+            id: uid(),
+            panelId: "A-104",
+            type: "Hotspot",
+            severity: "Critical",
+            status: "Open",
+            detectedAt: "2026-04-10",
+            x: 32,
+            y: 45,
+            note: "ΔT 22°C",
+          },
+          {
+            id: uid(),
+            panelId: "B-058",
+            type: "Soiling",
+            severity: "Info",
+            status: "Resolved",
+            detectedAt: "2026-04-10",
+            resolvedAt: "2026-05-12",
+            x: 68,
+            y: 60,
+          },
+        ],
+        createdAt: "2026-04-10T00:00:00Z",
+      },
+    ],
+    performance: seedPerformance(uid),
+    docs: [
+      {
+        id: uid(),
+        projectId: "p-nestle-1",
+        name: "Module Warranty 25yr.pdf",
+        type: "Warranty",
+        url: "#",
+        uploadedAt: "2021-03-16T00:00:00Z",
+        uploadedBy: "admin@datafy.com",
+      },
+      {
+        id: uid(),
+        projectId: "p-nestle-1",
+        name: "Huawei SUN2000 Manual.pdf",
+        type: "Inverter manual",
+        url: "#",
+        uploadedAt: "2021-03-16T00:00:00Z",
+        uploadedBy: "admin@datafy.com",
+      },
+    ],
+    audit: [
+      {
+        id: uid(),
+        ts: "2026-06-20T08:14:00Z",
+        userId: "om-client-1",
+        userName: "Ahsan Khan",
+        action: "download",
+        target: "Performance report (p-nestle-1)",
+      },
+    ],
+  };
+}
+
+function seedPerformance(uid: (prefix?: string) => string): PerformanceRecord[] {
+  const out: PerformanceRecord[] = [];
+  const projects = [
+    { id: "p-nestle-1", kwp: 450, psh: 4.6 },
+    { id: "p-jzs-1", kwp: 20, psh: 4.7 },
+    { id: "p-qa-1", kwp: 100000, psh: 4.8 },
+  ];
+  const today = new Date("2026-06-20T00:00:00Z");
+  for (const p of projects) {
+    for (let d = 29; d >= 0; d--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - d);
+      const wave = Math.sin(d / 3.5) * 0.1 + 0.92;
+      const expected = +(p.kwp * p.psh).toFixed(1);
+      out.push({
+        id: uid("perf"),
+        projectId: p.id,
+        date: date.toISOString().slice(0, 10),
+        energyKWh: +(expected * wave).toFixed(1),
+        expectedKWh: expected,
+      });
+    }
+  }
+  return out;
+}
