@@ -21,6 +21,7 @@
  *   uid/nowISO
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase/browser";
 import type { User } from "./auth";
 import { seedStore } from "./om-seed";
@@ -238,6 +239,22 @@ async function hasSupabaseSession(): Promise<boolean> {
     return !!data.session?.user;
   } catch {
     return false;
+  }
+}
+
+async function staffApiWrite(
+  path: "/api/om/clients" | "/api/om/projects",
+  method: "POST" | "PATCH",
+  body: Record<string, unknown>
+): Promise<void> {
+  const res = await fetch(path, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(payload?.error ?? `Could not save via ${path}.`);
   }
 }
 
@@ -540,6 +557,85 @@ function mapAudit(r: any): AuditEntry {
   };
 }
 
+/** Load the full O&M store from any Supabase client (browser or service role). */
+export async function pullStoreFromSupabase(client: SupabaseClient): Promise<Store> {
+  const [
+    clientsR,
+    activityR,
+    projectsR,
+    visitsR,
+    defectsR,
+    inspectionsR,
+    anomaliesR,
+    perfR,
+    docsR,
+    auditR,
+  ] = await Promise.all([
+    client.from("clients").select("*"),
+    client.from("client_activity").select("*"),
+    client.from("projects").select("*"),
+    client.from("visits").select("*"),
+    client.from("defects").select("*"),
+    client.from("inspections").select("*"),
+    client.from("anomalies").select("*"),
+    client.from("performance").select("*"),
+    client.from("docs").select("*"),
+    client.from("audit").select("*"),
+  ]);
+
+  const activityByClient = new Map<string, ActivityEvent[]>();
+  for (const a of (activityR.data ?? []) as any[]) {
+    const list = activityByClient.get(a.client_id) ?? [];
+    list.push({
+      id: a.id,
+      ts: a.ts,
+      type: a.type,
+      detail: a.detail ?? "",
+    });
+    activityByClient.set(a.client_id, list);
+  }
+
+  const defectsByVisit = new Map<string, DefectEntry[]>();
+  for (const d of (defectsR.data ?? []) as any[]) {
+    const list = defectsByVisit.get(d.visit_id) ?? [];
+    list.push(mapDefect(d));
+    defectsByVisit.set(d.visit_id, list);
+  }
+
+  const anomaliesByInspection = new Map<string, Anomaly[]>();
+  for (const a of (anomaliesR.data ?? []) as any[]) {
+    const list = anomaliesByInspection.get(a.inspection_id) ?? [];
+    list.push(mapAnomaly(a));
+    anomaliesByInspection.set(a.inspection_id, list);
+  }
+
+  return {
+    clients: ((clientsR.data ?? []) as any[]).map((r) =>
+      mapClient(r, activityByClient.get(r.id) ?? [])
+    ),
+    projects: ((projectsR.data ?? []) as any[]).map(mapProject),
+    visits: ((visitsR.data ?? []) as any[]).map((r) =>
+      mapVisit(r, defectsByVisit.get(r.id) ?? [])
+    ),
+    inspections: ((inspectionsR.data ?? []) as any[]).map((r) =>
+      mapInspection(r, anomaliesByInspection.get(r.id) ?? [])
+    ),
+    performance: ((perfR.data ?? []) as any[]).map(mapPerformance),
+    docs: ((docsR.data ?? []) as any[]).map(mapDoc),
+    audit: ((auditR.data ?? []) as any[]).map(mapAudit),
+  };
+}
+
+async function pullStoreViaStaffApi(): Promise<Store | null> {
+  try {
+    const res = await fetch("/api/om/store");
+    if (!res.ok) return null;
+    return (await res.json()) as Store;
+  } catch {
+    return null;
+  }
+}
+
 /** Fetch all rows (RLS scopes them to the current user). */
 export async function refresh(): Promise<void> {
   // Serialize concurrent refreshes.
@@ -550,78 +646,14 @@ export async function refresh(): Promise<void> {
       if (!remote) {
         if (!isSupabaseConfigured()) {
           cache = loadLocalStore();
-        } else if (!cache) {
-          cache = emptyStore();
+        } else {
+          cache = (await pullStoreViaStaffApi()) ?? cache ?? emptyStore();
         }
         emit();
         return;
       }
 
-      const [
-        clientsR,
-        activityR,
-        projectsR,
-        visitsR,
-        defectsR,
-        inspectionsR,
-        anomaliesR,
-        perfR,
-        docsR,
-        auditR,
-      ] = await Promise.all([
-        supabase.from("clients").select("*"),
-        supabase.from("client_activity").select("*"),
-        supabase.from("projects").select("*"),
-        supabase.from("visits").select("*"),
-        supabase.from("defects").select("*"),
-        supabase.from("inspections").select("*"),
-        supabase.from("anomalies").select("*"),
-        supabase.from("performance").select("*"),
-        supabase.from("docs").select("*"),
-        supabase.from("audit").select("*"),
-      ]);
-
-      const activityByClient = new Map<string, ActivityEvent[]>();
-      for (const a of (activityR.data ?? []) as any[]) {
-        const list = activityByClient.get(a.client_id) ?? [];
-        list.push({
-          id: a.id,
-          ts: a.ts,
-          type: a.type,
-          detail: a.detail ?? "",
-        });
-        activityByClient.set(a.client_id, list);
-      }
-
-      const defectsByVisit = new Map<string, DefectEntry[]>();
-      for (const d of (defectsR.data ?? []) as any[]) {
-        const list = defectsByVisit.get(d.visit_id) ?? [];
-        list.push(mapDefect(d));
-        defectsByVisit.set(d.visit_id, list);
-      }
-
-      const anomaliesByInspection = new Map<string, Anomaly[]>();
-      for (const a of (anomaliesR.data ?? []) as any[]) {
-        const list = anomaliesByInspection.get(a.inspection_id) ?? [];
-        list.push(mapAnomaly(a));
-        anomaliesByInspection.set(a.inspection_id, list);
-      }
-
-      cache = {
-        clients: ((clientsR.data ?? []) as any[]).map((r) =>
-          mapClient(r, activityByClient.get(r.id) ?? [])
-        ),
-        projects: ((projectsR.data ?? []) as any[]).map(mapProject),
-        visits: ((visitsR.data ?? []) as any[]).map((r) =>
-          mapVisit(r, defectsByVisit.get(r.id) ?? [])
-        ),
-        inspections: ((inspectionsR.data ?? []) as any[]).map((r) =>
-          mapInspection(r, anomaliesByInspection.get(r.id) ?? [])
-        ),
-        performance: ((perfR.data ?? []) as any[]).map(mapPerformance),
-        docs: ((docsR.data ?? []) as any[]).map(mapDoc),
-        audit: ((auditR.data ?? []) as any[]).map(mapAudit),
-      };
+      cache = await pullStoreFromSupabase(supabase);
       emit();
     } finally {
       loading = null;
@@ -714,21 +746,21 @@ export async function createClient(input: Omit<Client, "id" | "createdAt" | "act
     activity: [{ id: uid(), ts: nowISO(), type: "create", detail: "Client onboarded" }],
   };
 
+  const row = {
+    id,
+    company: input.company,
+    contact_name: input.contactName,
+    email: input.email,
+    phone: input.phone,
+    billing_tier: input.billingTier,
+    status: input.status,
+  };
   const remote = await hasSupabaseSession();
-  if (isSupabaseConfigured() && !remote) {
-    throw new Error("Your session expired. Sign out and sign in again to save clients.");
-  }
   if (remote) {
-    const { error } = await supabase.from("clients").insert({
-      id,
-      company: input.company,
-      contact_name: input.contactName,
-      email: input.email,
-      phone: input.phone,
-      billing_tier: input.billingTier,
-      status: input.status,
-    });
+    const { error } = await supabase.from("clients").insert(row);
     if (error) throw error;
+  } else if (isSupabaseConfigured()) {
+    await staffApiWrite("/api/om/clients", "POST", row);
   }
 
   await mutate((s) => {
@@ -753,7 +785,13 @@ export async function updateClient(id: string, patch: Partial<Client>, user: Use
   if (patch.phone !== undefined) row.phone = patch.phone;
   if (patch.billingTier !== undefined) row.billing_tier = patch.billingTier;
   if (patch.status !== undefined) row.status = patch.status;
-  await supabase.from("clients").update(row).eq("id", id);
+  const remote = await hasSupabaseSession();
+  if (remote) {
+    const { error } = await supabase.from("clients").update(row).eq("id", id);
+    if (error) throw error;
+  } else if (isSupabaseConfigured() && Object.keys(row).length > 0) {
+    await staffApiWrite("/api/om/clients", "PATCH", { id, ...row });
+  }
   await mutate((s) => {
     const c = s.clients.find((x) => x.id === id);
     if (c) Object.assign(c, patch);
@@ -800,13 +838,13 @@ export async function createProject(
     name: input.name.trim(),
   };
 
+  const row = projectToDbRow(project);
   const remote = await hasSupabaseSession();
-  if (isSupabaseConfigured() && !remote) {
-    throw new Error("Your session expired. Sign out and sign in again to save projects.");
-  }
   if (remote) {
-    const { error } = await supabase.from("projects").insert(projectToDbRow(project));
+    const { error } = await supabase.from("projects").insert(row);
     if (error) throw error;
+  } else if (isSupabaseConfigured()) {
+    await staffApiWrite("/api/om/projects", "POST", row);
   }
   await mutate((s) => {
     s.projects.push(project);
@@ -824,12 +862,11 @@ export async function updateProject(id: string, patch: Partial<Project>, user: U
   delete (row as { id?: string }).id;
 
   const remote = await hasSupabaseSession();
-  if (isSupabaseConfigured() && !remote) {
-    throw new Error("Your session expired. Sign out and sign in again to save projects.");
-  }
   if (remote) {
     const { error } = await supabase.from("projects").update(row).eq("id", id);
     if (error) throw error;
+  } else if (isSupabaseConfigured()) {
+    await staffApiWrite("/api/om/projects", "PATCH", { ...row, id });
   }
   await mutate((s) => {
     const p = s.projects.find((x) => x.id === id);

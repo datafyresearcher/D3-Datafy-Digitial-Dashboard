@@ -34,7 +34,9 @@ export default function OmLoginClient() {
     const user = await omLogin(loginId, password);
     setLoading(false);
     if (!user) {
-      setError("Invalid credentials. Try a demo account below.");
+      setError(
+        "Invalid credentials. Use one of the demo accounts below (admin@datafy.com / Datafy#2026)."
+      );
       return;
     }
     router.push("/portal");

@@ -229,6 +229,12 @@ function demoOmLogin(loginId: string, password: string): User | null {
   return sessionUser;
 }
 
+/** Known built-in portal demo account (used when Supabase Auth rows are unavailable). */
+export function isDemoPortalUser(user: User | null | undefined): boolean {
+  if (!user?.email) return false;
+  return Object.prototype.hasOwnProperty.call(omUsers, user.email.trim().toLowerCase());
+}
+
 /* ------------------------------------------------------------------ */
 /*  Fetch the profile row for a given auth uid.                        */
 /* ------------------------------------------------------------------ */
@@ -312,21 +318,20 @@ export async function omLogin(loginId: string, password: string): Promise<User |
       email: loginId.trim().toLowerCase(),
       password,
     });
-    if (error || !data.user) return null;
-
-    await stampLogin(data.user.id);
-    const profile = await fetchProfile(data.user.id);
-    if (!profile) {
+    if (!error && data.user) {
+      await stampLogin(data.user.id);
+      const profile = await fetchProfile(data.user.id);
+      if (profile) {
+        writeSession(PORTAL_SESSION_KEY, profile);
+        return profile;
+      }
       await supabase.auth.signOut();
-      clearSession(PORTAL_SESSION_KEY);
-      return null;
     }
-
-    writeSession(PORTAL_SESSION_KEY, profile);
-    return profile;
   } catch {
-    return null;
+    // Supabase Auth unavailable — fall through to demo accounts.
   }
+
+  return demoOmLogin(loginId, password);
 }
 
 export async function omLogout(): Promise<void> {
@@ -344,26 +349,22 @@ export async function getOmSession(): Promise<User | null> {
   }
 
   try {
-    const { data, error } = await supabase.auth.getSession();
+    const { data } = await supabase.auth.getSession();
     const uid = data.session?.user.id;
-    if (error || !uid) {
-      clearSession(PORTAL_SESSION_KEY);
-      return null;
-    }
-
-    const profile = await fetchProfile(uid);
-    if (!profile) {
-      clearSession(PORTAL_SESSION_KEY);
+    if (uid) {
+      const profile = await fetchProfile(uid);
+      if (profile) {
+        writeSession(PORTAL_SESSION_KEY, profile);
+        return profile;
+      }
       await supabase.auth.signOut();
-      return null;
     }
-
-    writeSession(PORTAL_SESSION_KEY, profile);
-    return profile;
   } catch {
-    clearSession(PORTAL_SESSION_KEY);
-    return null;
+    // Fall through to cached demo session.
   }
+
+  const cached = readSession(PORTAL_SESSION_KEY);
+  return isDemoPortalUser(cached) ? cached : null;
 }
 
 /* ------------------------------------------------------------------ */
