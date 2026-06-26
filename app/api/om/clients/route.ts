@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from "@/lib/supabase/server";
+import { deleteOmProjectTree } from "@/lib/supabase/om-admin";
 
 /** Staff-only write path when browser Supabase Auth is unavailable. */
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
   if (!isSupabaseAdminConfigured()) {
     return NextResponse.json(
@@ -67,15 +70,17 @@ export async function DELETE(request: Request) {
       }
     }
 
-    // Explicitly delete projects first so client delete succeeds even if the FK
-    // constraint on projects.client_id lacks ON DELETE CASCADE (or for older DBs).
-    // Child rows under projects (visits, inspections, etc.) cascade on project delete.
-    const { error: projectsErr } = await supabaseAdmin
+    // Explicitly delete projects and child rows first so older databases work
+    // even if foreign keys were created without ON DELETE CASCADE.
+    const { data: projects, error: projectsErr } = await supabaseAdmin
       .from("projects")
-      .delete()
+      .select("id")
       .eq("client_id", id);
     if (projectsErr) {
       return NextResponse.json({ error: projectsErr.message }, { status: 400 });
+    }
+    for (const project of projects ?? []) {
+      await deleteOmProjectTree(supabaseAdmin, project.id);
     }
 
     // Activity rows cascade via FK, but clean explicitly for safety.

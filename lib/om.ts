@@ -222,6 +222,9 @@ let loading: Promise<void> | null = null;
 let syncGeneration = 0;
 type Listener = () => void;
 const listeners = new Set<Listener>();
+type OmTableResult = {
+  error: { message?: string } | null;
+};
 
 export function uid(prefix = "id"): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-4)}`;
@@ -669,6 +672,23 @@ export async function pullStoreFromSupabase(client: SupabaseClient): Promise<Sto
     client.from("audit").select("*"),
   ]);
 
+  for (const result of [
+    clientsR,
+    activityR,
+    projectsR,
+    visitsR,
+    defectsR,
+    inspectionsR,
+    anomaliesR,
+    perfR,
+    docsR,
+    auditR,
+  ] as OmTableResult[]) {
+    if (result.error) {
+      throw new Error(result.error.message ?? "Failed to load portal data from Supabase.");
+    }
+  }
+
   const activityByClient = new Map<string, ActivityEvent[]>();
   for (const a of (activityR.data ?? []) as any[]) {
     const list = activityByClient.get(a.client_id) ?? [];
@@ -865,11 +885,7 @@ export async function updateClient(id: string, patch: Partial<Client>, user: Use
   if (patch.phone !== undefined) row.phone = patch.phone;
   if (patch.billingTier !== undefined) row.billing_tier = patch.billingTier;
   if (patch.status !== undefined) row.status = patch.status;
-  const remote = await hasSupabaseSession();
-  if (remote) {
-    const { error } = await supabase.from("clients").update(row).eq("id", id);
-    if (error) throw error;
-  } else if (isSupabaseConfigured() && Object.keys(row).length > 0) {
+  if (isSupabaseConfigured() && Object.keys(row).length > 0) {
     await staffApiWrite("/api/om/clients", "PATCH", { id, ...row });
   }
   await mutate((s) => {
@@ -923,11 +939,7 @@ export async function createProject(
   };
 
   const row = projectToDbRow(project);
-  const remote = await hasSupabaseSession();
-  if (remote) {
-    const { error } = await supabase.from("projects").insert(row);
-    if (error) throw error;
-  } else if (isSupabaseConfigured()) {
+  if (isSupabaseConfigured()) {
     await staffApiWrite("/api/om/projects", "POST", row);
   }
   await mutate((s) => {
@@ -945,11 +957,7 @@ export async function updateProject(id: string, patch: Partial<Project>, user: U
   const row = projectToDbRow(merged);
   delete (row as { id?: string }).id;
 
-  const remote = await hasSupabaseSession();
-  if (remote) {
-    const { error } = await supabase.from("projects").update(row).eq("id", id);
-    if (error) throw error;
-  } else if (isSupabaseConfigured()) {
+  if (isSupabaseConfigured()) {
     await staffApiWrite("/api/om/projects", "PATCH", { ...row, id });
   }
   await mutate((s) => {

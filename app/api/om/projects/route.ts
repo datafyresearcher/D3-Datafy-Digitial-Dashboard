@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from "@/lib/supabase/server";
+import { deleteOmProjectTree } from "@/lib/supabase/om-admin";
 
 /** Staff-only write path when browser Supabase Auth is unavailable. */
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
   if (!isSupabaseAdminConfigured()) {
     return NextResponse.json(
@@ -38,14 +41,14 @@ export async function DELETE(request: Request) {
     if (!id) {
       return NextResponse.json({ error: "Project id is required." }, { status: 400 });
     }
-    const { error } = await getSupabaseAdmin().from("projects").delete().eq("id", id);
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
+    await deleteOmProjectTree(getSupabaseAdmin(), id);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("DELETE /api/om/projects:", err);
-    return NextResponse.json({ error: "Failed to delete project." }, { status: 500 });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to delete project." },
+      { status: 500 }
+    );
   }
 }
 
