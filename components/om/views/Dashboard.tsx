@@ -8,11 +8,11 @@ import {
   CalendarClock,
   AlertTriangle,
   Leaf,
-  Zap,
   Gauge,
   TrendingUp,
   ArrowRight,
   ShieldAlert,
+  Globe,
 } from "lucide-react";
 import type { User } from "@/lib/auth";
 import {
@@ -26,12 +26,12 @@ import {
 } from "@/lib/om";
 import { canManage } from "../perms";
 import { Stat, Card, CardHeader, Badge, Button } from "../ui";
+import SiteLocationsView from "./SiteLocationsView";
 
 type ViewId =
   | "dashboard"
   | "clients"
   | "projects"
-  | "sites"
   | "overview"
   | "maintenance"
   | "inspections"
@@ -89,8 +89,26 @@ export default function Dashboard({
         </p>
       </div>
 
-      {/* Role-aware KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* GIS site map */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Globe className="w-5 h-5 text-brand-400" />
+          <div>
+            <h3 className="font-display font-bold text-lg leading-tight">Site Locations (GIS)</h3>
+            <p className="text-xs text-white/50">
+              {projects.length} monitored site{projects.length === 1 ? "" : "s"} on the hybrid satellite map
+            </p>
+          </div>
+        </div>
+        <SiteLocationsView user={user} store={store} embedded />
+      </div>
+
+      {/* Role-aware KPIs — single row on desktop */}
+      <div
+        className={`grid gap-3 ${
+          canManage(user) ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" : "grid-cols-2 lg:grid-cols-4"
+        }`}
+      >
         {canManage(user) && (
           <Stat label="Clients" value={store.clients.length} icon={Building2} tone="text-brand-400" />
         )}

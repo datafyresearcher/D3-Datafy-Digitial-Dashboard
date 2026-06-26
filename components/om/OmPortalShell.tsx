@@ -10,7 +10,6 @@ import {
   Radar,
   LineChart,
   FileText,
-  Globe,
   LogOut,
   Sun,
   Menu,
@@ -34,9 +33,8 @@ import MaintenanceView from "./views/MaintenanceView";
 import InspectionsView from "./views/InspectionsView";
 import PerformanceView from "./views/PerformanceView";
 import ReportsView from "./views/ReportsView";
-import SiteLocationsView from "./views/SiteLocationsView";
 
-type GlobalViewId = "dashboard" | "clients" | "projects" | "sites";
+type GlobalViewId = "dashboard" | "clients" | "projects";
 
 type ProjectViewId = "overview" | "maintenance" | "inspections" | "performance" | "reports";
 
@@ -44,7 +42,6 @@ const GLOBAL_VIEWS: { id: GlobalViewId; label: string; icon: typeof Sun; roles: 
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["super_admin", "field_engineer", "client"] },
   { id: "clients", label: "Clients", icon: Building2, roles: ["super_admin"] },
   { id: "projects", label: "Projects", icon: FolderKanban, roles: ["super_admin", "field_engineer", "client"] },
-  { id: "sites", label: "GIS", icon: Globe, roles: ["super_admin", "field_engineer", "client"] },
 ];
 
 const PROJECT_VIEWS: { id: ProjectViewId; label: string; icon: typeof Sun }[] = [
@@ -377,7 +374,6 @@ export default function OmPortalShell({ user }: { user: User }) {
           {inProjectContext && projectView === "reports" && (
             <ReportsView user={user} store={store} projectId={globalProjectId} onProject={selectProject} />
           )}
-          {!inProjectContext && view === "sites" && <SiteLocationsView user={user} store={store} />}
         </main>
       </div>
     </div>
