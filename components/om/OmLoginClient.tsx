@@ -4,7 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, Lock, Mail, ArrowRight, Sun, Loader2, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, ShieldCheck } from "lucide-react";
+import GridSentinelLogo from "./GridSentinelLogo";
+import OmThemeToggle from "./OmThemeToggle";
 import { OM_DEMO_CREDENTIALS, omLogin } from "@/lib/auth";
 
 const ROLE_TONE: Record<string, string> = {
@@ -13,6 +15,9 @@ const ROLE_TONE: Record<string, string> = {
   "Client Admin": "text-emerald-300",
   "Client Viewer": "text-sky-300",
 };
+
+const inputCls =
+  "w-full py-3 rounded-xl bg-om-input border border-om text-om-fg placeholder:text-om-faint focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30";
 
 export default function OmLoginClient() {
   const router = useRouter();
@@ -42,9 +47,12 @@ export default function OmLoginClient() {
   };
 
   return (
-    <main className="relative min-h-screen flex items-center justify-center px-4 py-16 bg-ink-900 text-white overflow-hidden">
+    <main className="relative min-h-screen flex items-center justify-center px-4 py-16 overflow-hidden">
       <div className="absolute inset-0 grid-bg opacity-20" />
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[700px] h-[700px] rounded-full bg-brand-500/15 blur-[160px]" />
+      <div className="absolute top-5 right-5 z-10">
+        <OmThemeToggle />
+      </div>
 
       <motion.div
         initial={{ opacity: 0, y: 24 }}
@@ -53,57 +61,51 @@ export default function OmLoginClient() {
         className="relative w-full max-w-md"
       >
         <Link href="/" className="flex flex-col items-center mb-8">
-          <div className="grid place-items-center w-14 h-14 rounded-2xl bg-brand-500/15 border border-brand-500/30 text-brand-400 mb-3">
-            <Sun className="w-7 h-7" />
-          </div>
-          <span className="font-display font-bold text-2xl">Solar O&amp;M Portal</span>
-          <span className="text-xs tracking-[0.25em] uppercase text-brand-400 font-bold mt-1">
-            Datafy Associate
-          </span>
+          <GridSentinelLogo variant="login" />
         </Link>
 
-        <div className="rounded-3xl bg-white/5 border border-white/10 p-8 backdrop-blur-xl">
-          <h1 className="font-display font-bold text-2xl mb-1">Sign in</h1>
-          <p className="text-white/60 text-sm mb-6">
-            Operations &amp; maintenance workspace for solar assets.
+        <div className="rounded-3xl bg-om-surface border border-om p-8 backdrop-blur-xl">
+          <h1 className="font-display font-bold text-2xl mb-1 text-om-fg">Sign in to GridSentinel</h1>
+          <p className="text-om-muted text-sm mb-6">
+            Monitor. Protect. Power on — your solar operations workspace.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-white/60 mb-2">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-om-muted mb-2">
                 Login ID
               </label>
               <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-white/40" />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-om-faint" />
                 <input
                   type="email"
                   required
                   value={loginId}
                   onChange={(e) => setLoginId(e.target.value)}
                   placeholder="you@company.com"
-                  className="w-full pl-11 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                  className={`${inputCls} pl-11 pr-4`}
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-white/60 mb-2">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-om-muted mb-2">
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-white/40" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-om-faint" />
                 <input
                   type={showPwd ? "text" : "password"}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-11 pr-11 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                  className={`${inputCls} pl-11 pr-11`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPwd((s) => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/80"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-om-faint hover:text-om-soft"
                 >
                   {showPwd ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
                 </button>
@@ -150,9 +152,9 @@ export default function OmLoginClient() {
                 <button
                   key={c.loginId}
                   onClick={() => fill(c.loginId, c.password)}
-                  className="w-full flex items-center justify-between gap-2 text-left text-xs px-3 py-2 rounded-lg hover:bg-white/5 transition-colors"
+                  className="w-full flex items-center justify-between gap-2 text-left text-xs px-3 py-2 rounded-lg hover:bg-om-surface-hover transition-colors"
                 >
-                  <span className="font-mono text-white/70">{c.loginId}</span>
+                  <span className="font-mono text-om-muted">{c.loginId}</span>
                   <span className={`font-semibold ${ROLE_TONE[c.role]}`}>{c.role}</span>
                 </button>
               ))}
@@ -160,7 +162,7 @@ export default function OmLoginClient() {
           </div>
         </div>
 
-        <p className="text-center text-white/40 text-xs mt-6">
+        <p className="text-center text-om-faint text-xs mt-6">
           <Link href="/" className="hover:text-brand-400">← Back to website</Link>
         </p>
       </motion.div>

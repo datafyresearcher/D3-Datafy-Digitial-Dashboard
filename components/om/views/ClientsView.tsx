@@ -123,7 +123,7 @@ export default function ClientsView({ user, store }: { user: User; store: Store 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="font-display font-bold text-2xl mb-1">Client &amp; User Management</h2>
-          <p className="text-sm text-white/60 max-w-2xl">
+          <p className="text-sm text-om-muted max-w-2xl">
             Onboard clients, manage billing tier &amp; status, auto-generate credentials, and track
             activity per client.
           </p>
@@ -134,7 +134,7 @@ export default function ClientsView({ user, store }: { user: User; store: Store 
       </div>
 
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-om-faint" />
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -155,11 +155,11 @@ export default function ClientsView({ user, store }: { user: User; store: Store 
                 <Badge tone={STATUS_TONE[c.status]}>{c.status}</Badge>
               </div>
               <h3 className="font-display font-bold text-lg leading-tight">{c.company}</h3>
-              <p className="text-xs text-white/50 mb-3">{c.billingTier} tier · {projectCount} projects</p>
-              <dl className="space-y-1.5 text-sm border-t border-white/10 pt-3">
-                <div className="flex justify-between"><dt className="text-white/50">Contact</dt><dd>{c.contactName}</dd></div>
-                <div className="flex justify-between"><dt className="text-white/50">Email</dt><dd className="text-white/80 truncate ml-2">{c.email}</dd></div>
-                <div className="flex justify-between"><dt className="text-white/50">Phone</dt><dd>{c.phone}</dd></div>
+              <p className="text-xs text-om-subtle mb-3">{c.billingTier} tier · {projectCount} projects</p>
+              <dl className="space-y-1.5 text-sm border-t border-om pt-3">
+                <div className="flex justify-between"><dt className="text-om-subtle">Contact</dt><dd>{c.contactName}</dd></div>
+                <div className="flex justify-between"><dt className="text-om-subtle">Email</dt><dd className="text-om-soft truncate ml-2">{c.email}</dd></div>
+                <div className="flex justify-between"><dt className="text-om-subtle">Phone</dt><dd>{c.phone}</dd></div>
               </dl>
               <div className="flex flex-wrap gap-1.5 mt-4">
                 <Button size="sm" variant="subtle" onClick={() => setActivityFor(c)}>
@@ -233,13 +233,13 @@ export default function ClientsView({ user, store }: { user: User; store: Store 
       <Modal open={!!creds} onClose={() => setCreds(null)} title="Credentials Generated">
         {creds && (
           <div className="space-y-4">
-            <p className="text-sm text-white/70">
+            <p className="text-sm text-om-muted">
               Login credentials have been generated. In production these would be emailed to the
               client automatically.
             </p>
             <div className="rounded-xl bg-brand-500/5 border border-brand-500/20 p-4 space-y-2 font-mono text-sm">
-              <div className="flex justify-between"><span className="text-white/50">Login ID</span><span>{creds.email}</span></div>
-              <div className="flex justify-between"><span className="text-white/50">Password</span><span className="text-brand-300">{creds.password}</span></div>
+              <div className="flex justify-between"><span className="text-om-subtle">Login ID</span><span>{creds.email}</span></div>
+              <div className="flex justify-between"><span className="text-om-subtle">Password</span><span className="text-brand-300">{creds.password}</span></div>
             </div>
             <Button className="w-full" onClick={() => setCreds(null)}>Done</Button>
           </div>
@@ -250,15 +250,15 @@ export default function ClientsView({ user, store }: { user: User; store: Store 
       <Modal open={!!activityFor} onClose={() => setActivityFor(null)} title={activityFor ? `${activityFor.company} — Activity` : ""}>
         {activityFor && (
           <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs text-white/50 pb-2 border-b border-white/10">
+            <div className="flex items-center justify-between text-xs text-om-subtle pb-2 border-b border-om">
               <span>Last login: {activityFor.activity.find((a) => a.type === "login")?.ts.slice(0, 10) ?? "—"}</span>
               <Badge tone={STATUS_TONE[activityFor.status]}>{activityFor.status}</Badge>
             </div>
             {activityFor.activity.map((ev) => (
-              <div key={ev.id} className="flex items-center gap-3 text-sm py-2 border-b border-white/5">
+              <div key={ev.id} className="flex items-center gap-3 text-sm py-2 border-b border-om">
                 <Badge tone={ev.type === "download" ? "blue" : ev.type === "login" ? "green" : "neutral"}>{ev.type}</Badge>
-                <span className="text-white/80 flex-1">{ev.detail}</span>
-                <span className="text-white/30 text-xs">{new Date(ev.ts).toLocaleString()}</span>
+                <span className="text-om-soft flex-1">{ev.detail}</span>
+                <span className="text-om-faint text-xs">{new Date(ev.ts).toLocaleString()}</span>
               </div>
             ))}
           </div>
@@ -269,17 +269,17 @@ export default function ClientsView({ user, store }: { user: User; store: Store 
       <Modal open={!!usersFor} onClose={() => setUsersFor(null)} title={usersFor ? `${usersFor.company} — Users` : ""}>
         {usersFor && (
           <div className="space-y-3">
-            <p className="text-xs text-white/50">
+            <p className="text-xs text-om-subtle">
               Users associated with this client. Sub-roles are controlled by Datafy.
             </p>
             {clientUsers.map((u) => (
-              <div key={u.id} className="flex items-center gap-3 rounded-xl bg-white/5 p-3">
+              <div key={u.id} className="flex items-center gap-3 rounded-xl bg-om-surface p-3">
                 <div className="grid place-items-center w-9 h-9 rounded-full bg-brand-500/20 text-brand-300 text-xs font-bold">
                   {u.name.split(" ").map((p) => p[0]).slice(0, 2).join("")}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{u.name}</p>
-                  <p className="text-xs text-white/50 truncate">{u.email}</p>
+                  <p className="text-xs text-om-subtle truncate">{u.email}</p>
                 </div>
                 <Badge tone={u.clientSubRole === "client_admin" ? "purple" : "blue"}>
                   {u.clientSubRole === "client_admin" ? "Admin (all projects)" : "Viewer"}
@@ -287,9 +287,9 @@ export default function ClientsView({ user, store }: { user: User; store: Store 
               </div>
             ))}
             {clientUsers.length === 0 && (
-              <p className="text-center text-white/40 text-sm py-4">No users linked yet.</p>
+              <p className="text-center text-om-faint text-sm py-4">No users linked yet.</p>
             )}
-            <div className="rounded-xl bg-brand-500/5 border border-brand-500/20 p-3 text-xs text-white/60 flex items-center gap-2">
+            <div className="rounded-xl bg-brand-500/5 border border-brand-500/20 p-3 text-xs text-om-muted flex items-center gap-2">
               <KeyRound className="w-4 h-4 text-brand-400" />
               New users get auto-generated credentials emailed on creation.
             </div>

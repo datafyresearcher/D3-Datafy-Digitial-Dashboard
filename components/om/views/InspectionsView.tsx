@@ -98,7 +98,7 @@ export default function InspectionsView({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="font-display font-bold text-2xl mb-1">Drone Inspection</h2>
-          <p className="text-sm text-white/60 max-w-2xl">
+          <p className="text-sm text-om-muted max-w-2xl">
             Orthomosaics, RGB/thermal imagery, ML anomaly overlays, a plant-layout pin view and
             inspection-to-inspection comparison.
           </p>
@@ -115,7 +115,7 @@ export default function InspectionsView({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Stat label="Inspections" value={inspections.length} icon={Radar} />
         <Stat label="Open Anomalies" value={openCount} tone={openCount ? "text-red-400" : "text-emerald-400"} icon={AlertTriangle} />
-        <Stat label="Critical / Open" value={critical} tone={critical ? "text-red-400" : "text-white"} icon={AlertTriangle} />
+        <Stat label="Critical / Open" value={critical} tone={critical ? "text-red-400" : "text-om-fg"} icon={AlertTriangle} />
         <Stat label="Persistent" value={persistent.length} sub="Still open from earlier" icon={History} />
       </div>
 
@@ -126,7 +126,7 @@ export default function InspectionsView({
             <History className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
             <div>
               <p className="font-semibold text-amber-200 text-sm">{persistent.length} persistent anomal{persistent.length !== 1 ? "ies" : "y"}</p>
-              <p className="text-xs text-white/60 mt-0.5">
+              <p className="text-xs text-om-muted mt-0.5">
                 Detected in earlier inspections and still Open now: {persistent.map((p) => `${p.earlier.panelId} (${p.earlier.type})`).join(", ")}
               </p>
             </div>
@@ -139,7 +139,7 @@ export default function InspectionsView({
 
       {/* Date filter */}
       <div className="flex items-center gap-3">
-        <span className="text-xs font-semibold uppercase tracking-wider text-white/50">Filter by date</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-om-subtle">Filter by date</span>
         <Select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="max-w-[200px]">
           <option value="">All inspections</option>
           {[...new Set(inspections.map((i) => i.date))].sort().map((d) => (
@@ -163,7 +163,7 @@ export default function InspectionsView({
                 </div>
               </div>
               <h3 className="font-display font-bold text-lg">{ins.date}</h3>
-              <p className="text-xs text-white/50 mb-3">{ins.anomalies.length} anomalies detected</p>
+              <p className="text-xs text-om-subtle mb-3">{ins.anomalies.length} anomalies detected</p>
               <div className="flex flex-wrap gap-1.5 mb-4">
                 {ins.orthomosaicUrl && <Badge tone="blue"><FileImage className="w-3 h-3" /> Orthomosaic</Badge>}
                 {ins.rgbUrl && <Badge tone="neutral"><ImageIcon className="w-3 h-3" /> RGB</Badge>}
@@ -236,12 +236,12 @@ function InspectionDetail({ open, onClose, inspection, user }: { open: boolean; 
         {/* Processed imagery */}
         {inspection.processedImages.length > 0 && (
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">Processed Anomaly Overlays</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-om-subtle mb-2">Processed Anomaly Overlays</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {inspection.processedImages.map((p) => (
-                <div key={p.id} className="rounded-lg overflow-hidden bg-white/5">
+                <div key={p.id} className="rounded-lg overflow-hidden bg-om-surface">
                   <img src={p.url} alt={p.label} className="w-full aspect-video object-cover" />
-                  <p className="text-xs text-white/60 px-2 py-1.5 truncate">{p.label}</p>
+                  <p className="text-xs text-om-muted px-2 py-1.5 truncate">{p.label}</p>
                 </div>
               ))}
             </div>
@@ -249,9 +249,9 @@ function InspectionDetail({ open, onClose, inspection, user }: { open: boolean; 
         )}
 
         {/* Layout pin view */}
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+        <div className="rounded-2xl bg-om-surface border border-om p-4">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-om-subtle flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5" /> Plant Layout — Anomaly Pins
             </p>
             {canUpload(user) && (
@@ -276,12 +276,12 @@ function InspectionDetail({ open, onClose, inspection, user }: { open: boolean; 
           <div
             ref={layoutRef}
             onClick={placePin}
-            className={`relative w-full aspect-[16/9] rounded-xl overflow-hidden bg-ink-900 border border-white/10 ${pinning ? "cursor-crosshair" : ""}`}
+            className={`relative w-full aspect-[16/9] rounded-xl overflow-hidden om-bg-elevated border border-om ${pinning ? "cursor-crosshair" : ""}`}
           >
             {inspection.layoutUrl ? (
               <img src={inspection.layoutUrl} alt="Plant layout" className="absolute inset-0 w-full h-full object-cover opacity-80" />
             ) : (
-              <div className="absolute inset-0 grid place-items-center text-white/30 text-sm">
+              <div className="absolute inset-0 grid place-items-center text-om-faint text-sm">
                 {pinning ? "Click anywhere to place a pin" : "No layout image uploaded — pins still plot on a grid"}
                 <div className="absolute inset-0" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
               </div>
@@ -308,22 +308,22 @@ function InspectionDetail({ open, onClose, inspection, user }: { open: boolean; 
 
         {/* Anomaly log */}
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">Anomaly Log</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-om-subtle mb-2">Anomaly Log</p>
           <div className="space-y-1.5">
             {inspection.anomalies.map((a) => (
-              <div key={a.id} className="flex items-center gap-3 rounded-lg bg-white/5 px-3 py-2 text-sm">
+              <div key={a.id} className="flex items-center gap-3 rounded-lg bg-om-surface px-3 py-2 text-sm">
                 <button onClick={() => toggleAnomaly(inspection.id, a.id)} className="flex-shrink-0">
                   {a.status === "Open" ? <Circle className="w-4 h-4 text-red-400" /> : <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
                 </button>
-                <span className="font-mono text-white/90 w-20">{a.panelId}</span>
+                <span className="font-mono text-om-fg w-20">{a.panelId}</span>
                 <Badge tone="neutral">{a.type}</Badge>
                 <Badge tone={SEV_TONE[a.severity]}>{a.severity}</Badge>
-                <span className="text-white/40 text-xs">{a.detectedAt}</span>
-                {a.note && <span className="text-white/50 text-xs hidden sm:inline">· {a.note}</span>}
+                <span className="text-om-faint text-xs">{a.detectedAt}</span>
+                {a.note && <span className="text-om-subtle text-xs hidden sm:inline">· {a.note}</span>}
                 <Badge tone={a.status === "Open" ? "red" : "green"} className="ml-auto">{a.status}</Badge>
               </div>
             ))}
-            {inspection.anomalies.length === 0 && <p className="text-xs text-white/40 py-2">No anomalies recorded.</p>}
+            {inspection.anomalies.length === 0 && <p className="text-xs text-om-faint py-2">No anomalies recorded.</p>}
           </div>
         </div>
       </div>
@@ -349,7 +349,7 @@ function CompareInspections({ open, onClose, inspections }: { open: boolean; onC
   return (
     <Modal open={open} onClose={onClose} title="Inspection Comparison" wide>
       <div className="space-y-4">
-        <p className="text-sm text-white/60">
+        <p className="text-sm text-om-muted">
           Compare two inspections to see which anomalies from the earlier date are still open.
         </p>
         <div className="grid sm:grid-cols-2 gap-3">
@@ -369,29 +369,29 @@ function CompareInspections({ open, onClose, inspections }: { open: boolean; onC
           <div className="grid sm:grid-cols-3 gap-3">
             <Card className="p-3 text-center">
               <p className="text-2xl font-display font-bold text-amber-400">{a.anomalies.filter((x) => x.status === "Open").length}</p>
-              <p className="text-xs text-white/50">Open on {a.date}</p>
+              <p className="text-xs text-om-subtle">Open on {a.date}</p>
             </Card>
             <Card className="p-3 text-center">
               <p className="text-2xl font-display font-bold text-red-400">{stillOpen.length}</p>
-              <p className="text-xs text-white/50">Still open on {b.date}</p>
+              <p className="text-xs text-om-subtle">Still open on {b.date}</p>
             </Card>
             <Card className="p-3 text-center">
               <p className="text-2xl font-display font-bold text-emerald-400">{a.anomalies.filter((x) => x.status === "Open").length - stillOpen.length}</p>
-              <p className="text-xs text-white/50">Resolved since</p>
+              <p className="text-xs text-om-subtle">Resolved since</p>
             </Card>
           </div>
         )}
 
         {a && b && stillOpen.length > 0 && (
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">Persisting anomalies</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-om-subtle mb-2">Persisting anomalies</p>
             <div className="space-y-1.5">
               {stillOpen.map((an) => (
                 <div key={an.id} className="flex items-center gap-3 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-sm">
                   <span className="font-mono w-20">{an.panelId}</span>
                   <Badge tone="neutral">{an.type}</Badge>
                   <Badge tone={SEV_TONE[an.severity]}>{an.severity}</Badge>
-                  <span className="text-white/50 text-xs ml-auto">Detected {an.detectedAt} · still open</span>
+                  <span className="text-om-subtle text-xs ml-auto">Detected {an.detectedAt} · still open</span>
                 </div>
               ))}
             </div>
@@ -457,8 +457,8 @@ function InspectionForm({ open, onClose, project, user }: { open: boolean; onClo
           <UploadField label="Plant layout image" icon={MapPin} value={layout} onChange={async (f) => setLayout(await toDataUrl(f))} />
         </div>
 
-        <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">Processed Anomaly Overlays (post ML/DL)</p>
+        <div className="rounded-xl bg-om-surface border border-om p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-om-subtle mb-2">Processed Anomaly Overlays (post ML/DL)</p>
           <div className="grid grid-cols-3 gap-2 mb-3">
             {processed.map((p) => (
               <div key={p.id} className="relative aspect-video rounded overflow-hidden group">
@@ -467,13 +467,13 @@ function InspectionForm({ open, onClose, project, user }: { open: boolean; onClo
               </div>
             ))}
           </div>
-          <label className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-white/20 text-xs text-white/60 hover:border-brand-500 cursor-pointer">
+          <label className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-om-strong text-xs text-om-muted hover:border-brand-500 cursor-pointer">
             <Plus className="w-3 h-3" /> Upload processed images
             <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => uploadProcessed(e.target.files)} />
           </label>
         </div>
 
-        <p className="text-xs text-white/40">Anomalies can be pinned on the plant layout after upload.</p>
+        <p className="text-xs text-om-faint">Anomalies can be pinned on the plant layout after upload.</p>
 
         <div className="flex gap-2 pt-2">
           <Button type="submit" className="flex-1">Save Inspection</Button>
@@ -497,10 +497,10 @@ function UploadField({
 }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wider text-white/50 mb-1.5 flex items-center gap-1.5">
+      <p className="text-xs font-semibold uppercase tracking-wider text-om-subtle mb-1.5 flex items-center gap-1.5">
         <Icon className="w-3.5 h-3.5" /> {label}
       </p>
-      <label className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-white/20 text-sm text-white/60 hover:border-brand-500 cursor-pointer transition-colors">
+      <label className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-om-strong text-sm text-om-muted hover:border-brand-500 cursor-pointer transition-colors">
         {value ? <span className="text-emerald-400 text-xs">✓ Uploaded</span> : <span>Choose file…</span>}
         <input type="file" className="hidden" onChange={(e) => onChange(e.target.files)} />
       </label>

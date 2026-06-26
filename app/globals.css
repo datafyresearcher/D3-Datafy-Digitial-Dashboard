@@ -88,3 +88,76 @@ body {
   background: #10b981;
   color: #fff;
 }
+
+/* ── GridSentinel portal theme ───────────────────────────────────── */
+.om-portal {
+  --om-bg: #0a0f0d;
+  --om-bg-elevated: #0f1714;
+  --om-fg: #ffffff;
+  --om-fg-soft: rgb(255 255 255 / 0.8);
+  --om-fg-muted: rgb(255 255 255 / 0.6);
+  --om-fg-subtle: rgb(255 255 255 / 0.5);
+  --om-fg-faint: rgb(255 255 255 / 0.4);
+  --om-border: rgb(255 255 255 / 0.1);
+  --om-border-strong: rgb(255 255 255 / 0.15);
+  --om-surface: rgb(255 255 255 / 0.05);
+  --om-surface-hover: rgb(255 255 255 / 0.1);
+  --om-input-bg: rgb(255 255 255 / 0.05);
+  --om-overlay: rgb(0 0 0 / 0.6);
+  --om-header-bg: rgb(10 15 13 / 0.82);
+  --om-nav-idle: rgb(255 255 255 / 0.7);
+  --om-scrollbar-track: #0a0f0d;
+}
+
+.om-portal[data-om-theme="light"] {
+  --om-bg: #f1f5f9;
+  --om-bg-elevated: #ffffff;
+  --om-fg: #0f172a;
+  --om-fg-soft: rgb(15 23 42 / 0.85);
+  --om-fg-muted: rgb(15 23 42 / 0.65);
+  --om-fg-subtle: rgb(15 23 42 / 0.5);
+  --om-fg-faint: rgb(15 23 42 / 0.4);
+  --om-border: rgb(15 23 42 / 0.1);
+  --om-border-strong: rgb(15 23 42 / 0.16);
+  --om-surface: rgb(15 23 42 / 0.04);
+  --om-surface-hover: rgb(15 23 42 / 0.08);
+  --om-input-bg: #ffffff;
+  --om-overlay: rgb(15 23 42 / 0.45);
+  --om-header-bg: rgb(255 255 255 / 0.88);
+  --om-nav-idle: rgb(15 23 42 / 0.65);
+  --om-scrollbar-track: #e2e8f0;
+}
+
+.om-bg { background-color: var(--om-bg); }
+.om-bg-elevated { background-color: var(--om-bg-elevated); }
+.om-header-bg { background-color: var(--om-header-bg); }
+.text-om-fg { color: var(--om-fg); }
+.text-om-soft { color: var(--om-fg-soft); }
+.text-om-muted { color: var(--om-fg-muted); }
+.text-om-subtle { color: var(--om-fg-subtle); }
+.text-om-faint { color: var(--om-fg-faint); }
+.border-om { border-color: var(--om-border); }
+.border-om-strong { border-color: var(--om-border-strong); }
+.bg-om-surface { background-color: var(--om-surface); }
+.bg-om-input { background-color: var(--om-input-bg); }
+.hover\:bg-om-surface-hover:hover { background-color: var(--om-surface-hover); }
+.om-overlay { background-color: var(--om-overlay); }
+.om-nav-idle { color: var(--om-nav-idle); }
+.divide-om > :not([hidden]) ~ :not([hidden]) { border-color: var(--om-border); }
+
+.om-portal .om-card {
+  border-radius: 1rem;
+  border: 1px solid var(--om-border);
+  background-color: var(--om-surface);
+}
+
+.om-portal[data-om-theme="light"] .om-badge-green { color: #047857; background-color: rgb(16 185 129 / 0.12); }
+.om-portal[data-om-theme="light"] .om-badge-amber { color: #b45309; background-color: rgb(245 158 11 / 0.14); }
+.om-portal[data-om-theme="light"] .om-badge-red { color: #b91c1c; background-color: rgb(239 68 68 / 0.12); }
+.om-portal[data-om-theme="light"] .om-badge-blue { color: #0369a1; background-color: rgb(14 165 233 / 0.12); }
+.om-portal[data-om-theme="light"] .om-badge-purple { color: #7e22ce; background-color: rgb(168 85 247 / 0.12); }
+.om-portal[data-om-theme="light"] .om-badge-neutral { color: var(--om-fg-muted); background-color: var(--om-surface-hover); }
+
+.om-portal[data-om-theme="light"] ::-webkit-scrollbar-track {
+  background: var(--om-scrollbar-track);
+}

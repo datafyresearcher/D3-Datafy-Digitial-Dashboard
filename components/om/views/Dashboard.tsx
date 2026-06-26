@@ -80,7 +80,7 @@ export default function Dashboard({
         <h2 className="font-display font-bold text-2xl mb-1">
           Welcome back, {user.name.split(" ")[0]}
         </h2>
-        <p className="text-sm text-white/60">
+        <p className="text-sm text-om-muted">
           {canManage(user)
             ? `Managing ${store.clients.length} clients and ${store.projects.length} projects.`
             : user.role === "client"
@@ -95,7 +95,7 @@ export default function Dashboard({
           <Globe className="w-5 h-5 text-brand-400" />
           <div>
             <h3 className="font-display font-bold text-lg leading-tight">Site Locations (GIS)</h3>
-            <p className="text-xs text-white/50">
+            <p className="text-xs text-om-subtle">
               {projects.length} monitored site{projects.length === 1 ? "" : "s"} on the hybrid satellite map
             </p>
           </div>
@@ -150,7 +150,7 @@ export default function Dashboard({
                 {overdueProjects.length} project{overdueProjects.length !== 1 ? "s" : ""} overdue for
                 scheduled maintenance
               </p>
-              <p className="text-xs text-white/60 mt-0.5">
+              <p className="text-xs text-om-muted mt-0.5">
                 {overdueProjects.map((p) => p.name).join(", ")}
               </p>
             </div>
@@ -182,12 +182,12 @@ export default function Dashboard({
             const bar =
               score >= 80 ? "bg-emerald-500" : score >= 60 ? "bg-amber-500" : "bg-red-500";
             return (
-              <Card key={p.id} className="p-4 hover:border-white/20 transition-colors cursor-pointer">
+              <Card key={p.id} className="p-4 hover:border-om-strong transition-colors cursor-pointer">
                 <div onClick={() => onNavigate("overview", p.id)}>
                 <div className="flex items-start justify-between mb-2">
                   <div className="min-w-0">
                     <p className="font-semibold text-sm truncate">{p.name}</p>
-                    <p className="text-xs text-white/50">{p.classification} · {p.sizeKWp} kWp</p>
+                    <p className="text-xs text-om-subtle">{p.classification} · {p.sizeKWp} kWp</p>
                   </div>
                   {ms.overdue ? (
                     <Badge tone="red">Overdue</Badge>
@@ -197,12 +197,12 @@ export default function Dashboard({
                 </div>
                 <div className="flex items-baseline gap-2 mb-2">
                   <span className={`text-2xl font-display font-bold ${tone}`}>{score}</span>
-                  <span className="text-xs text-white/50">health score</span>
+                  <span className="text-xs text-om-subtle">health score</span>
                 </div>
-                <div className="h-1.5 rounded-full bg-white/10 overflow-hidden mb-3">
+                <div className="h-1.5 rounded-full bg-om-surface-hover overflow-hidden mb-3">
                   <div className={`h-full rounded-full ${bar}`} style={{ width: `${score}%` }} />
                 </div>
-                <div className="flex items-center justify-between text-xs text-white/50">
+                <div className="flex items-center justify-between text-xs text-om-subtle">
                   <span>Last visit: {ms.lastDate ?? "—"}</span>
                   <span>{ms.daysSince > 9000 ? "never" : `${ms.daysSince}d ago`}</span>
                 </div>
@@ -217,42 +217,42 @@ export default function Dashboard({
       {canManage(user) ? (
         <Card>
           <CardHeader title="Recent Audit Log" icon={TrendingUp} />
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-om">
             {store.audit.slice(0, 6).map((a) => (
               <div key={a.id} className="flex items-center gap-3 px-5 py-3 text-sm">
                 <Badge tone={a.action === "delete" ? "red" : a.action === "upload" ? "blue" : a.action === "create" ? "green" : "neutral"}>
                   {a.action}
                 </Badge>
-                <span className="text-white/80 flex-1 truncate">{a.target}</span>
-                <span className="text-white/40 text-xs">{a.userName}</span>
-                <span className="text-white/30 text-xs">
+                <span className="text-om-soft flex-1 truncate">{a.target}</span>
+                <span className="text-om-faint text-xs">{a.userName}</span>
+                <span className="text-om-faint text-xs">
                   {new Date(a.ts).toLocaleDateString()}
                 </span>
               </div>
             ))}
             {store.audit.length === 0 && (
-              <p className="px-5 py-6 text-center text-white/40 text-sm">No activity yet.</p>
+              <p className="px-5 py-6 text-center text-om-faint text-sm">No activity yet.</p>
             )}
           </div>
         </Card>
       ) : (
         <Card>
           <CardHeader title="Your Activity" icon={TrendingUp} />
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-om">
             {projects[0] &&
               getClient(store, user).activity.slice(0, 6).map((ev) => (
                 <div key={ev.id} className="flex items-center gap-3 px-5 py-3 text-sm">
                   <Badge tone={ev.type === "download" ? "blue" : ev.type === "login" ? "green" : "neutral"}>
                     {ev.type}
                   </Badge>
-                  <span className="text-white/80 flex-1">{ev.detail}</span>
-                  <span className="text-white/30 text-xs">
+                  <span className="text-om-soft flex-1">{ev.detail}</span>
+                  <span className="text-om-faint text-xs">
                     {new Date(ev.ts).toLocaleDateString()}
                   </span>
                 </div>
               ))}
             {projects.length === 0 && (
-              <p className="px-5 py-6 text-center text-white/40 text-sm">
+              <p className="px-5 py-6 text-center text-om-faint text-sm">
                 No projects assigned yet.
               </p>
             )}
@@ -260,7 +260,7 @@ export default function Dashboard({
         </Card>
       )}
 
-      <p className="text-center text-xs text-white/30 pt-2">
+      <p className="text-center text-xs text-om-faint pt-2">
         Solar O&amp;M Portal ·{" "}
         <Link href="/d3" className="hover:text-brand-400">
           D³ Dashboard

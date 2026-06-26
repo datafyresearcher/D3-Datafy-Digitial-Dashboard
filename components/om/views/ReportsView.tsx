@@ -92,7 +92,7 @@ export default function ReportsView({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="font-display font-bold text-2xl mb-1">Reports &amp; Documents</h2>
-          <p className="text-sm text-white/60 max-w-2xl">
+          <p className="text-sm text-om-muted max-w-2xl">
             Auto-generated PDF reports, a document vault, and the audit log (admin only).
           </p>
         </div>
@@ -108,7 +108,7 @@ export default function ReportsView({
       <Card>
         <CardHeader title="Auto-Generated Reports" icon={FileText} />
         <div className="p-5 space-y-4">
-          <p className="text-xs text-white/50">Select a report type, then print or save as PDF.</p>
+          <p className="text-xs text-om-subtle">Select a report type, then print or save as PDF.</p>
           <div className="flex flex-wrap gap-2">
             {([
               { id: "om", label: "O&M Visit Summary", icon: Wrench },
@@ -119,7 +119,7 @@ export default function ReportsView({
                 key={r.id}
                 onClick={() => { setReportKind(r.id); setShowReport(true); }}
                 className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
-                  false ? "bg-brand-600 border-transparent text-white" : "border-white/10 bg-white/5 text-white/80 hover:bg-white/10"
+                  false ? "bg-brand-600 border-transparent text-white" : "border-om bg-om-surface text-om-soft hover:bg-om-surface-hover"
                 }`}
               >
                 <r.icon className="w-4 h-4" /> {r.label}
@@ -135,16 +135,16 @@ export default function ReportsView({
         {docs.length === 0 ? (
           <EmptyState icon={FolderLock} title="No documents" hint={canUpload(user) ? "Upload warranties, contracts, manuals." : "No documents shared."} />
         ) : (
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-om">
             {docs.map((d) => (
               <div key={d.id} className="flex items-center gap-3 px-5 py-3 text-sm">
-                <div className="grid place-items-center w-9 h-9 rounded-lg bg-white/5 text-white/60">
+                <div className="grid place-items-center w-9 h-9 rounded-lg bg-om-surface text-om-muted">
                   <FileText className="w-4 h-4" />
                 </div>
                 <Badge tone={DOC_TONE[d.type]}>{d.type}</Badge>
-                <span className="flex-1 truncate text-white/90">{d.name}</span>
-                <span className="text-xs text-white/40 hidden sm:inline">by {d.uploadedBy}</span>
-                <span className="text-xs text-white/30">{new Date(d.uploadedAt).toLocaleDateString()}</span>
+                <span className="flex-1 truncate text-om-fg">{d.name}</span>
+                <span className="text-xs text-om-faint hidden sm:inline">by {d.uploadedBy}</span>
+                <span className="text-xs text-om-faint">{new Date(d.uploadedAt).toLocaleDateString()}</span>
                 <button
                   onClick={() => logAudit(user, "download", `Doc ${d.name}`)}
                   className="text-brand-400 hover:text-brand-300"
@@ -167,21 +167,21 @@ export default function ReportsView({
       {canManage(user) ? (
         <Card>
           <CardHeader title="Audit Log" icon={ShieldCheck} action={<Badge tone="purple">Super Admin</Badge>} />
-          <div className="divide-y divide-white/5 max-h-96 overflow-y-auto">
+          <div className="divide-y divide-om max-h-96 overflow-y-auto">
             {store.audit.map((a) => (
               <div key={a.id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
                 <Badge tone={a.action === "delete" ? "red" : a.action === "upload" ? "blue" : a.action === "create" ? "green" : "neutral"}>{a.action}</Badge>
-                <span className="text-white/80 flex-1 truncate">{a.target}</span>
-                <span className="text-white/40 text-xs">{a.userName}</span>
-                <span className="text-white/30 text-xs">{new Date(a.ts).toLocaleString()}</span>
+                <span className="text-om-soft flex-1 truncate">{a.target}</span>
+                <span className="text-om-faint text-xs">{a.userName}</span>
+                <span className="text-om-faint text-xs">{new Date(a.ts).toLocaleString()}</span>
               </div>
             ))}
-            {store.audit.length === 0 && <p className="px-5 py-6 text-center text-white/40 text-sm">No audit entries.</p>}
+            {store.audit.length === 0 && <p className="px-5 py-6 text-center text-om-faint text-sm">No audit entries.</p>}
           </div>
         </Card>
       ) : (
         <Card className="p-4">
-          <div className="flex items-center gap-3 text-sm text-white/50">
+          <div className="flex items-center gap-3 text-sm text-om-subtle">
             <ScrollText className="w-4 h-4" /> Audit logs are visible to Super Admins only.
           </div>
         </Card>
@@ -246,7 +246,7 @@ function UploadDoc({ open, onClose, project, user }: { open: boolean; onClose: (
           </Select>
         </Field>
         <Field label="File">
-          <label className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-white/20 text-sm text-white/60 hover:border-brand-500 cursor-pointer">
+          <label className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-om-strong text-sm text-om-muted hover:border-brand-500 cursor-pointer">
             {url ? <span className="text-emerald-400 text-xs">✓ {name}</span> : <span>Choose file…</span>}
             <input
               type="file"
@@ -311,7 +311,7 @@ function ReportPreview({
         </div>
 
         {/* printable report */}
-        <div className="rounded-2xl border border-white/10 bg-white text-black p-6 print:border-0 print:p-0">
+        <div className="rounded-2xl border border-om bg-white text-black p-6 print:border-0 print:p-0">
           <div className="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
             <div>
               <p className="text-[10px] uppercase tracking-widest text-emerald-600 font-bold">Datafy Associate</p>

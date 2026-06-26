@@ -107,7 +107,7 @@ export default function PerformanceView({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="font-display font-bold text-2xl mb-1">Performance Analytics</h2>
-          <p className="text-sm text-white/60 max-w-2xl">
+          <p className="text-sm text-om-muted max-w-2xl">
             Energy generation, Performance Ratio (PR), actual vs expected output and CO₂ offset — via
             manual entry or CSV.
           </p>
@@ -125,7 +125,7 @@ export default function PerformanceView({
         <Stat label="Performance Ratio" value={`${pr.toFixed(1)}%`} tone={pr >= 80 ? "text-emerald-400" : pr >= 70 ? "text-amber-400" : "text-red-400"} icon={Gauge} />
         <Stat label="Total Generation" value={`${(totalEnergy / 1000).toFixed(1)} MWh`} sub={`Over ${recs.length} days`} icon={Zap} />
         <Stat label="CO₂ Offset" value={`${(co2 / 1000).toFixed(2)} t`} sub="≈ 0.42 kg / kWh" icon={Leaf} tone="text-emerald-400" />
-        <Stat label="Low-output Days" value={lowDays.length} sub={`Below ${threshold}% PR`} tone={lowDays.length ? "text-red-400" : "text-white"} icon={AlertTriangle} />
+        <Stat label="Low-output Days" value={lowDays.length} sub={`Below ${threshold}% PR`} tone={lowDays.length ? "text-red-400" : "text-om-fg"} icon={AlertTriangle} />
       </div>
 
       {/* Threshold alert */}
@@ -135,13 +135,13 @@ export default function PerformanceView({
             <TrendingDown className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="font-semibold text-red-200 text-sm">Performance alert triggered</p>
-              <p className="text-xs text-white/60 mt-0.5">
+              <p className="text-xs text-om-muted mt-0.5">
                 {lowDays.length} day{lowDays.length !== 1 ? "s" : ""} fell below the {threshold}% PR threshold: {lowDays.slice(0, 5).map((d) => d.date).join(", ")}{lowDays.length > 5 ? "…" : ""}
               </p>
             </div>
             <div className="flex items-center gap-2">
               <Input type="number" value={threshold} onChange={(e) => setThreshold(+e.target.value)} className="w-20 text-xs py-1.5" />
-              <span className="text-xs text-white/50">% PR</span>
+              <span className="text-xs text-om-subtle">% PR</span>
             </div>
           </div>
         </Card>
@@ -197,7 +197,7 @@ export default function PerformanceView({
       {canUpload(user) && (
         <Card className="p-4">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-om-subtle flex items-center gap-1.5">
               <FileSpreadsheet className="w-3.5 h-3.5" /> Bulk CSV upload
             </p>
             <Button size="sm" variant="subtle" onClick={() => setShowCsv((s) => !s)}>{showCsv ? "Cancel" : "Paste CSV"}</Button>
@@ -209,12 +209,12 @@ export default function PerformanceView({
                 value={csvText}
                 onChange={(e) => setCsvText(e.target.value)}
                 placeholder={"2026-06-01,1820\n2026-06-02,1740\n2026-06-03,1900"}
-                className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-mono text-white placeholder-white/40 focus:border-brand-500 focus:outline-none"
+                className="w-full px-3 py-2 rounded-xl bg-om-surface border border-om text-xs font-mono text-om-fg placeholder:text-om-faint focus:border-brand-500 focus:outline-none"
               />
               <Button size="sm" onClick={importCsv}><Upload className="w-3.5 h-3.5" /> Import {csvText ? `(${parsePerformanceCsv(csvText).length} rows)` : ""}</Button>
             </div>
           ) : (
-            <p className="text-xs text-white/40">Format: <code className="text-brand-300">date,energy_kwh</code> per line. Example: <code className="text-brand-300">2026-06-01,1820</code></p>
+            <p className="text-xs text-om-faint">Format: <code className="text-brand-300">date,energy_kwh</code> per line. Example: <code className="text-brand-300">2026-06-01,1820</code></p>
           )}
         </Card>
       )}

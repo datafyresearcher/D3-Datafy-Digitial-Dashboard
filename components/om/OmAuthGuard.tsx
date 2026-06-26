@@ -45,10 +45,10 @@ export default function OmAuthGuard({
 
   if (!ready) {
     return (
-      <div className="min-h-screen grid place-items-center bg-ink-900 text-white">
+      <div className="min-h-screen grid place-items-center om-bg">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-7 h-7 text-brand-400 animate-spin" />
-          <span className="text-white/60 text-sm">Loading portal…</span>
+          <span className="text-om-muted text-sm">Loading portal…</span>
         </div>
       </div>
     );

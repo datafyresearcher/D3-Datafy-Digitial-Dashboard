@@ -86,7 +86,7 @@ export default function ProjectsView({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="font-display font-bold text-2xl mb-1">Projects</h2>
-          <p className="text-sm text-white/60 max-w-2xl">
+          <p className="text-sm text-om-muted max-w-2xl">
             Site records with string/zone mapping, photo gallery, schedule and client-visible notes.
           </p>
         </div>
@@ -98,7 +98,7 @@ export default function ProjectsView({
       </div>
 
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-om-faint" />
         <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search projects…" className="pl-10 max-w-md" />
       </div>
 
@@ -108,7 +108,7 @@ export default function ProjectsView({
           const score = healthScore(p);
           const client = store.clients.find((c) => c.id === p.clientId);
           return (
-            <Card key={p.id} className="p-5 hover:border-white/20 transition-colors cursor-pointer" >
+            <Card key={p.id} className="p-5 hover:border-om-strong transition-colors cursor-pointer" >
               <div onClick={() => onOpenProject?.(p.id)}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="grid place-items-center w-11 h-11 rounded-xl bg-brand-500/15 text-brand-400">
@@ -120,26 +120,26 @@ export default function ProjectsView({
                   </div>
                 </div>
                 <h3 className="font-display font-bold text-lg leading-tight mb-1">{p.name}</h3>
-                <p className="text-xs text-white/50 flex items-center gap-1 mb-3">
+                <p className="text-xs text-om-subtle flex items-center gap-1 mb-3">
                   <MapPin className="w-3 h-3" /> {p.address}
                 </p>
                 <div className="grid grid-cols-3 gap-2 text-center mb-3">
-                  <div className="rounded-lg bg-white/5 py-2">
-                    <p className="text-[10px] uppercase text-white/40">Size</p>
+                  <div className="rounded-lg bg-om-surface py-2">
+                    <p className="text-[10px] uppercase text-om-faint">Size</p>
                     <p className="text-sm font-bold">{p.sizeKWp} kWp</p>
                   </div>
-                  <div className="rounded-lg bg-white/5 py-2">
-                    <p className="text-[10px] uppercase text-white/40">Panels</p>
+                  <div className="rounded-lg bg-om-surface py-2">
+                    <p className="text-[10px] uppercase text-om-faint">Panels</p>
                     <p className="text-sm font-bold">{p.panelCount.toLocaleString()}</p>
                   </div>
-                  <div className="rounded-lg bg-white/5 py-2">
-                    <p className="text-[10px] uppercase text-white/40">Health</p>
+                  <div className="rounded-lg bg-om-surface py-2">
+                    <p className="text-[10px] uppercase text-om-faint">Health</p>
                     <p className={`text-sm font-bold ${score >= 80 ? "text-emerald-400" : score >= 60 ? "text-amber-400" : "text-red-400"}`}>{score}</p>
                   </div>
                 </div>
-                <p className="text-xs text-white/50">{client?.company}</p>
+                <p className="text-xs text-om-subtle">{client?.company}</p>
               </div>
-              <div className="flex gap-1.5 mt-3 pt-3 border-t border-white/10">
+              <div className="flex gap-1.5 mt-3 pt-3 border-t border-om">
                 {ms.overdue && <Badge tone="red">Overdue</Badge>}
                 <Badge tone="neutral">{p.maintenanceSchedule.join(" + ")}</Badge>
                 {canManage(user) && (
@@ -198,7 +198,7 @@ export function ProjectOverview({
     <div className="space-y-6">
       <div>
         <h2 className="font-display font-bold text-2xl mb-1">{project.name}</h2>
-        <p className="text-sm text-white/60 flex items-center gap-1">
+        <p className="text-sm text-om-muted flex items-center gap-1">
           <MapPin className="w-3.5 h-3.5" /> {project.address}
         </p>
       </div>
@@ -235,9 +235,9 @@ export function ProjectOverview({
             ["Last visit", ms.lastDate ?? "—"],
             ["Health score", `${score}/100`],
           ].map(([k, v]) => (
-            <div key={k} className="rounded-xl bg-white/5 p-3">
-              <p className="text-[10px] uppercase tracking-wider text-white/40">{k}</p>
-              <p className="text-sm font-medium text-white/90">{v}</p>
+            <div key={k} className="rounded-xl bg-om-surface p-3">
+              <p className="text-[10px] uppercase tracking-wider text-om-faint">{k}</p>
+              <p className="text-sm font-medium text-om-fg">{v}</p>
             </div>
           ))}
         </div>
@@ -250,13 +250,13 @@ export function ProjectOverview({
 
         <Section icon={Network} title="String & Zone Mapping">
           {project.stringZones.length === 0 ? (
-            <p className="text-sm text-white/40 py-3">No strings/zones mapped.</p>
+            <p className="text-sm text-om-faint py-3">No strings/zones mapped.</p>
           ) : (
             <div className="space-y-2">
               {project.stringZones.map((s) => (
-                <div key={s.id} className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-sm">
+                <div key={s.id} className="flex items-center justify-between rounded-lg bg-om-surface px-3 py-2 text-sm">
                   <span className="font-medium">{s.name}</span>
-                  <span className="text-white/60">{s.location}</span>
+                  <span className="text-om-muted">{s.location}</span>
                   <Badge tone="blue">{s.panelCount} panels</Badge>
                 </div>
               ))}
@@ -266,11 +266,11 @@ export function ProjectOverview({
 
         <Section icon={Images} title="Site Photo Gallery">
           {project.gallery.length === 0 ? (
-            <p className="text-sm text-white/40 py-3">No site photos yet. Upload from the project editor.</p>
+            <p className="text-sm text-om-faint py-3">No site photos yet. Upload from the project editor.</p>
           ) : (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
               {project.gallery.map((g) => (
-                <div key={g.id} className="aspect-square rounded-lg overflow-hidden bg-white/5">
+                <div key={g.id} className="aspect-square rounded-lg overflow-hidden bg-om-surface">
                   <img src={g.url} alt={g.caption} className="w-full h-full object-cover" />
                 </div>
               ))}
@@ -279,7 +279,7 @@ export function ProjectOverview({
         </Section>
 
         <Section icon={StickyNote} title="Client Notes (visible to client)">
-          <p className="text-sm text-white/80 whitespace-pre-wrap">{project.clientNotes || "No notes."}</p>
+          <p className="text-sm text-om-soft whitespace-pre-wrap">{project.clientNotes || "No notes."}</p>
         </Section>
       </div>
 
@@ -298,7 +298,7 @@ export function ProjectOverview({
 
 function Section({ icon: Icon, title, children }: { icon: typeof Zap; title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+    <div className="rounded-2xl bg-om-surface border border-om p-4">
       <h4 className="flex items-center gap-2 font-semibold text-sm mb-3">
         <Icon className="w-4 h-4 text-brand-400" /> {title}
       </h4>
@@ -470,7 +470,7 @@ function ProjectForm({
                   key={s}
                   onClick={() => toggleSchedule(s)}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                    on ? "bg-brand-600 border-transparent text-white" : "border-white/10 bg-white/5 text-white/70"
+                    on ? "bg-brand-600 border-transparent text-white" : "border-om bg-om-surface text-om-muted"
                   }`}
                 >
                   {s}
@@ -481,16 +481,16 @@ function ProjectForm({
         </Field>
 
         {/* String / zone editor */}
-        <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-white/50 mb-3 flex items-center gap-2">
+        <div className="rounded-xl bg-om-surface border border-om p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-om-subtle mb-3 flex items-center gap-2">
             <Network className="w-4 h-4" /> String / Zone Mapping
           </p>
           <div className="space-y-2 mb-3">
             {form.stringZones.map((s) => (
               <div key={s.id} className="flex items-center gap-2 text-sm">
                 <span className="font-medium flex-1">{s.name}</span>
-                <span className="text-white/50">{s.location}</span>
-                <span className="text-white/60 w-20 text-right">{s.panelCount} panels</span>
+                <span className="text-om-subtle">{s.location}</span>
+                <span className="text-om-muted w-20 text-right">{s.panelCount} panels</span>
                 <button type="button" onClick={() => setForm({ ...form, stringZones: form.stringZones.filter((x) => x.id !== s.id) })} className="text-red-400 hover:text-red-300">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -506,8 +506,8 @@ function ProjectForm({
         </div>
 
         {/* Gallery upload */}
-        <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-white/50 mb-3 flex items-center gap-2">
+        <div className="rounded-xl bg-om-surface border border-om p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-om-subtle mb-3 flex items-center gap-2">
             <Images className="w-4 h-4" /> Site Photo Gallery
           </p>
           {form.gallery.length > 0 && (
@@ -522,7 +522,7 @@ function ProjectForm({
               ))}
             </div>
           )}
-          <label className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-dashed border-white/20 text-sm text-white/60 hover:border-brand-500 hover:text-brand-300 cursor-pointer transition-colors">
+          <label className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-dashed border-om-strong text-sm text-om-muted hover:border-brand-500 hover:text-brand-300 cursor-pointer transition-colors">
             <Plus className="w-4 h-4" /> Upload site photos
             <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => onGalleryUpload(e.target.files)} />
           </label>

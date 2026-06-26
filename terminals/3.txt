@@ -1,0 +1,18 @@
+---
+pid: 5896
+cwd: "C:\Users\Datafy\OneDrive\Desktop\vibe"
+command: "cd \"C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\" && npm run dev 2>&1"
+started_at: 2026-06-26T15:01:33.103Z
+running_for_ms: 1785012  
+---
+
+> datafy-associate@1.0.0 dev
+> next dev
+
+  ▲ Next.js 14.2.5
+ ⚠ Port 3000 is in use, trying 3001 instead.
+  - Local:        http://localhost:3001
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1545ms

@@ -18,10 +18,10 @@ export function Button({
 }) {
   const variants: Record<BtnVariant, string> = {
     primary: "bg-brand-600 text-white hover:bg-brand-500 shadow-lg shadow-brand-600/25",
-    ghost: "text-white/70 hover:bg-white/5 hover:text-white",
+    ghost: "text-om-muted hover:bg-om-surface-hover hover:text-om-fg",
     danger: "bg-red-500/15 text-red-300 hover:bg-red-500/25 border border-red-500/30",
-    outline: "border border-white/15 text-white/80 hover:bg-white/5",
-    subtle: "bg-white/5 text-white/80 hover:bg-white/10 border border-white/10",
+    outline: "border border-om text-om-soft hover:bg-om-surface-hover",
+    subtle: "bg-om-surface text-om-soft hover:bg-om-surface-hover border border-om",
   };
   const sizes = { sm: "px-3 py-1.5 text-xs", md: "px-4 py-2.5 text-sm" };
   return (
@@ -45,7 +45,7 @@ export function Field({
 }) {
   return (
     <label className={`block ${className}`}>
-      <span className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-1.5">
+      <span className="block text-xs font-semibold uppercase tracking-wider text-om-subtle mb-1.5">
         {label}
       </span>
       {children}
@@ -54,7 +54,7 @@ export function Field({
 }
 
 const inputCls =
-  "w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white placeholder-white/40 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 transition-all";
+  "w-full px-3.5 py-2.5 rounded-xl bg-om-input border border-om text-sm text-om-fg placeholder:text-om-faint focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 transition-all";
 
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`${inputCls} ${props.className ?? ""}`} />;
@@ -68,7 +68,7 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...props}
-      className={`${inputCls} ${props.className ?? ""} [&>option]:bg-ink-800`}
+      className={`${inputCls} ${props.className ?? ""} [&>option]:bg-om-bg-elevated [&>option]:text-om-fg`}
     />
   );
 }
@@ -85,12 +85,12 @@ export function Badge({
   className?: string;
 }) {
   const tones = {
-    neutral: "bg-white/10 text-white/70",
-    green: "bg-emerald-500/15 text-emerald-300",
-    amber: "bg-amber-500/15 text-amber-300",
-    red: "bg-red-500/15 text-red-300",
-    blue: "bg-sky-500/15 text-sky-300",
-    purple: "bg-purple-500/15 text-purple-300",
+    neutral: "bg-om-surface-hover text-om-muted om-badge-neutral",
+    green: "bg-emerald-500/15 text-emerald-300 om-badge-green",
+    amber: "bg-amber-500/15 text-amber-300 om-badge-amber",
+    red: "bg-red-500/15 text-red-300 om-badge-red",
+    blue: "bg-sky-500/15 text-sky-300 om-badge-blue",
+    purple: "bg-purple-500/15 text-purple-300 om-badge-purple",
   };
   return (
     <span
@@ -110,9 +110,7 @@ export function Card({
   children: React.ReactNode;
   className?: string;
 }) {
-  return (
-    <div className={`rounded-2xl bg-white/5 border border-white/10 ${className}`}>{children}</div>
-  );
+  return <div className={`om-card ${className}`}>{children}</div>;
 }
 
 export function CardHeader({
@@ -125,8 +123,8 @@ export function CardHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-      <h3 className="flex items-center gap-2 font-display font-bold text-base">
+    <div className="flex items-center justify-between px-5 py-4 border-b border-om">
+      <h3 className="flex items-center gap-2 font-display font-bold text-base text-om-fg">
         {Icon && <Icon className="w-4.5 h-4.5 text-brand-400" />}
         {title}
       </h3>
@@ -142,7 +140,7 @@ export function Stat({
   value,
   sub,
   icon: Icon,
-  tone = "text-white",
+  tone = "text-om-fg",
 }: {
   label: string;
   value: React.ReactNode;
@@ -153,11 +151,11 @@ export function Stat({
   return (
     <Card className="p-4">
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[11px] font-medium uppercase tracking-wider text-white/50">{label}</span>
+        <span className="text-[11px] font-medium uppercase tracking-wider text-om-subtle">{label}</span>
         {Icon && <Icon className={`w-4 h-4 ${tone}`} />}
       </div>
       <p className={`text-2xl font-display font-bold ${tone}`}>{value}</p>
-      {sub && <p className="text-xs text-white/50 mt-0.5">{sub}</p>}
+      {sub && <p className="text-xs text-om-subtle mt-0.5">{sub}</p>}
     </Card>
   );
 }
@@ -191,15 +189,15 @@ export function Modal({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 grid place-items-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 om-overlay backdrop-blur-sm" onClick={onClose} />
       <div
-        className={`relative w-full ${wide ? "max-w-3xl" : "max-w-lg"} max-h-[90vh] overflow-y-auto rounded-2xl bg-ink-800 border border-white/15 shadow-2xl`}
+        className={`relative w-full ${wide ? "max-w-3xl" : "max-w-lg"} max-h-[90vh] overflow-y-auto rounded-2xl om-bg-elevated border border-om-strong shadow-2xl`}
       >
-        <div className="sticky top-0 flex items-center justify-between px-5 py-4 border-b border-white/10 bg-ink-800/95 backdrop-blur z-10">
-          <h3 className="font-display font-bold text-lg">{title}</h3>
+        <div className="sticky top-0 flex items-center justify-between px-5 py-4 border-b border-om om-header-bg backdrop-blur z-10">
+          <h3 className="font-display font-bold text-lg text-om-fg">{title}</h3>
           <button
             onClick={onClose}
-            className="grid place-items-center w-8 h-8 rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+            className="grid place-items-center w-8 h-8 rounded-lg text-om-muted hover:bg-om-surface-hover hover:text-om-fg transition-colors"
             aria-label="Close"
           >
             <X className="w-4.5 h-4.5" />
@@ -223,7 +221,7 @@ export function EmptyState({
   hint?: string;
 }) {
   return (
-    <div className="text-center py-12 text-white/40">
+    <div className="text-center py-12 text-om-faint">
       <Icon className="w-8 h-8 mx-auto mb-3 opacity-50" />
       <p className="text-sm font-medium">{title}</p>
       {hint && <p className="text-xs mt-1">{hint}</p>}

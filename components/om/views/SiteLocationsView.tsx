@@ -18,35 +18,7 @@ import {
 import type { User } from "@/lib/auth";
 import type { Store, Project } from "@/lib/om";
 import { visibleProjects } from "@/lib/om";
-
-/** Free hybrid satellite + street labels (no Mapbox token required). */
-const HYBRID_MAP_STYLE: maplibregl.StyleSpecification = {
-  version: 8,
-  sources: {
-    satellite: {
-      type: "raster",
-      tiles: [
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      ],
-      tileSize: 256,
-      attribution: "Tiles © Esri",
-    },
-    labels: {
-      type: "raster",
-      tiles: [
-        "https://a.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png",
-        "https://b.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png",
-        "https://c.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png",
-        "https://d.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png",
-      ],
-      tileSize: 256,
-    },
-  },
-  layers: [
-    { id: "satellite", type: "raster", source: "satellite" },
-    { id: "labels", type: "raster", source: "labels" },
-  ],
-};
+import { getOmMapConfig } from "@/lib/om-map-style";
 function getGlobeCamera(embedded: boolean) {
   return {
     center: [0, 18] as [number, number],
@@ -83,7 +55,6 @@ const SITE_CAMERA = { pitch: 58, bearing: -20 };
 const INTRO_GLOBE_HOLD_MS = 1600;
 const INTRO_PROJECT_DURATION_MS = 6200;
 const INTRO_PROJECT_HOLD_MS = 2200;
-const SITE_BOUNDARY_ZOOM = 20;
 
 type LayerEntry = {
   id: string;
@@ -233,6 +204,7 @@ export default function SiteLocationsView({
   const [panelCollapsed, setPanelCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const mapConfig = useMemo(() => getOmMapConfig(), []);
   const projects = useMemo(() => visibleProjects(user), [user, store]);
   const projectKey = useMemo(() => projects.map((project) => project.id).join("|"), [projects]);
   const totalCapacity = projects.reduce((sum, project) => sum + project.sizeKWp, 0);
@@ -359,7 +331,7 @@ export default function SiteLocationsView({
     if (boundary) {
       map.fitBounds(getBoundaryBounds(boundary), {
         padding: { top: 150, right: 180, bottom: 130, left: 380 },
-        maxZoom: SITE_BOUNDARY_ZOOM,
+        maxZoom: mapConfig.maxSiteZoom,
         pitch: SITE_CAMERA.pitch,
         bearing: SITE_CAMERA.bearing,
         duration,
@@ -368,7 +340,7 @@ export default function SiteLocationsView({
     } else {
       map.flyTo({
         center: [project.lng, project.lat],
-        zoom: 13.5,
+        zoom: Math.min(13.5, mapConfig.maxSiteZoom),
         pitch: SITE_CAMERA.pitch,
         bearing: SITE_CAMERA.bearing,
         duration,
@@ -376,7 +348,7 @@ export default function SiteLocationsView({
       });
     }
     window.setTimeout(() => openProjectPopup(project), Math.min(900, duration));
-  }, [clientById]);
+  }, [clientById, mapConfig.maxSiteZoom]);
 
   const runIntroTour = useCallback(() => {
     const map = mapRef.current;
@@ -400,7 +372,7 @@ export default function SiteLocationsView({
         if (boundary) {
           map.fitBounds(getBoundaryBounds(boundary), {
             padding: { top: 150, right: 180, bottom: 130, left: 380 },
-            maxZoom: SITE_BOUNDARY_ZOOM,
+            maxZoom: mapConfig.maxSiteZoom,
             pitch: SITE_CAMERA.pitch,
             bearing: SITE_CAMERA.bearing,
             duration: INTRO_PROJECT_DURATION_MS,
@@ -409,7 +381,7 @@ export default function SiteLocationsView({
         } else {
           map.flyTo({
             center: [project.lng, project.lat],
-            zoom: 13.3,
+            zoom: Math.min(13.3, mapConfig.maxSiteZoom),
             pitch: SITE_CAMERA.pitch,
             bearing: SITE_CAMERA.bearing,
             duration: INTRO_PROJECT_DURATION_MS,
@@ -423,7 +395,7 @@ export default function SiteLocationsView({
         focusAllSites(2600);
       }
     }, INTRO_GLOBE_HOLD_MS);
-  }, [clientById, focusAllSites, focusGlobeView, projects]);
+  }, [clientById, focusAllSites, focusGlobeView, mapConfig.maxSiteZoom, projects]);
 
   const focusEntry = (entry: LayerEntry) => {
     if (entry.id === "globe-view") {
@@ -474,11 +446,12 @@ export default function SiteLocationsView({
     const initialCamera = getGlobeCamera(embedded);
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
-      style: HYBRID_MAP_STYLE,
+      style: mapConfig.style,
       center: initialCamera.center,
       zoom: initialCamera.zoom,
       pitch: initialCamera.pitch,
       bearing: initialCamera.bearing,
+      maxZoom: mapConfig.maxMapZoom,
     });
 
     mapRef.current = map;
@@ -591,7 +564,7 @@ export default function SiteLocationsView({
       map.remove();
       mapRef.current = null;
     };
-  }, [clientById, embedded, focusAllSites, focusProject, projects, runIntroTour]);
+  }, [clientById, embedded, focusAllSites, focusProject, mapConfig, projects, runIntroTour]);
 
   useEffect(() => {
     mapRef.current?.resize();
@@ -634,7 +607,7 @@ export default function SiteLocationsView({
     <div
       className={
         embedded
-          ? "h-[min(520px,55vh)] min-h-[400px] rounded-2xl overflow-hidden border border-white/10"
+          ? "h-[min(520px,55vh)] min-h-[400px] rounded-2xl overflow-hidden border border-om"
           : "-m-5 h-[calc(100vh-73px)] min-h-[680px] lg:-m-8"
       }
     >
@@ -1013,6 +986,27 @@ export default function SiteLocationsView({
             font-size: 11px;
           }
 
+          .om-geospatial-basemap-badge {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            z-index: 10;
+            max-width: min(280px, calc(100% - 24px));
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 6px;
+            background: rgba(15, 23, 42, 0.82);
+            color: #cbd5e1;
+            padding: 6px 10px;
+            font-size: 10px;
+            line-height: 1.35;
+            backdrop-filter: blur(12px);
+          }
+
+          .om-geospatial-basemap-badge strong {
+            color: #f8fafc;
+            font-weight: 700;
+          }
+
           @media (max-width: 767px) {
             .om-geospatial-panel {
               top: 10px;
@@ -1152,6 +1146,23 @@ export default function SiteLocationsView({
           <div className="mt-2 text-xs text-slate-300">
             {totalPanels.toLocaleString()} panels under client-visible monitoring.
           </div>
+          <div className="mt-2 pt-2 border-t border-om text-[11px] text-slate-400">
+            Basemap: <span className="text-slate-200">{mapConfig.label}</span>
+            {mapConfig.provider === "esri" && (
+              <span className="block mt-1 text-amber-300/90">
+                Add <code className="text-[10px]">NEXT_PUBLIC_MAPBOX_TOKEN</code> to .env.local for HD zoom on site boundaries.
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="om-geospatial-basemap-badge">
+          Basemap: <strong>{mapConfig.label}</strong>
+          {mapConfig.provider === "esri" && (
+            <span className="block text-amber-300/90 mt-0.5">
+              Set NEXT_PUBLIC_MAPBOX_TOKEN in .env.local for high-detail site zoom.
+            </span>
+          )}
         </div>
 
         <button type="button" className="om-geospatial-replay" onClick={runIntroTour}>

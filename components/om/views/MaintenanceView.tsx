@@ -83,7 +83,7 @@ export default function MaintenanceView({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="font-display font-bold text-2xl mb-1">O&amp;M Scheduling &amp; Logs</h2>
-          <p className="text-sm text-white/60 max-w-2xl">
+          <p className="text-sm text-om-muted max-w-2xl">
             Scheduled maintenance, visit records with before/after imagery, defect log and side-by-side
             comparison.
           </p>
@@ -104,7 +104,7 @@ export default function MaintenanceView({
           label="Last Visit"
           value={ms.lastDate ?? "—"}
           sub={ms.daysSince > 9000 ? "never" : `${ms.daysSince} days ago`}
-          tone={ms.overdue ? "text-red-400" : "text-white"}
+          tone={ms.overdue ? "text-red-400" : "text-om-fg"}
           icon={CalendarClock}
         />
         <Stat label="Total Visits" value={visits.length} icon={Wrench} />
@@ -125,7 +125,7 @@ export default function MaintenanceView({
         <Card className="p-4 border-brand-500/20 bg-brand-500/5">
           <div className="flex items-center gap-3">
             <CalendarClock className="w-5 h-5 text-brand-400" />
-            <p className="text-sm text-white/80">
+            <p className="text-sm text-om-soft">
               Next scheduled visit reminder (email/SMS) will be sent 7 days before{" "}
               <strong>{nextDue.toISOString().slice(0, 10)}</strong>.
             </p>
@@ -139,7 +139,7 @@ export default function MaintenanceView({
         {visits.length === 0 ? (
           <EmptyState icon={CalendarClock} title="No visits logged" hint="Field engineers log visits here." />
         ) : (
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-om">
             {visits.map((v) => (
               <VisitRow key={v.id} visit={v} store={store} user={user} projectId={project.id} />
             ))}
@@ -192,7 +192,7 @@ function VisitRow({ visit, store, user, projectId }: { visit: MaintenanceVisit; 
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm">{visit.date} · {visit.cleaningType}</p>
-          <p className="text-xs text-white/50">{visit.technician} · {visit.weather}</p>
+          <p className="text-xs text-om-subtle">{visit.technician} · {visit.weather}</p>
         </div>
         {openDefects > 0 && <Badge tone="red">{openDefects} open defects</Badge>}
         {visit.signature && <Badge tone="green"><PenLine className="w-3 h-3" /> Signed</Badge>}
@@ -201,22 +201,22 @@ function VisitRow({ visit, store, user, projectId }: { visit: MaintenanceVisit; 
       {expanded && (
         <div className="pb-5 space-y-4">
           <div className="grid sm:grid-cols-2 gap-4">
-            <div className="rounded-xl bg-white/5 p-4">
-              <p className="text-[11px] uppercase tracking-wider text-white/40 mb-1">Pre-observation</p>
-              <p className="text-sm text-white/80">{visit.preObservation || "—"}</p>
+            <div className="rounded-xl bg-om-surface p-4">
+              <p className="text-[11px] uppercase tracking-wider text-om-faint mb-1">Pre-observation</p>
+              <p className="text-sm text-om-soft">{visit.preObservation || "—"}</p>
             </div>
-            <div className="rounded-xl bg-white/5 p-4">
-              <p className="text-[11px] uppercase tracking-wider text-white/40 mb-1">Post-observation</p>
-              <p className="text-sm text-white/80">{visit.postObservation || "—"}</p>
+            <div className="rounded-xl bg-om-surface p-4">
+              <p className="text-[11px] uppercase tracking-wider text-om-faint mb-1">Post-observation</p>
+              <p className="text-sm text-om-soft">{visit.postObservation || "—"}</p>
             </div>
           </div>
 
           {visit.images.length > 0 && (
             <div>
-              <p className="text-[11px] uppercase tracking-wider text-white/40 mb-2 flex items-center gap-1"><Camera className="w-3 h-3" /> Before / After Images</p>
+              <p className="text-[11px] uppercase tracking-wider text-om-faint mb-2 flex items-center gap-1"><Camera className="w-3 h-3" /> Before / After Images</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {visit.images.map((img) => (
-                  <div key={img.id} className="relative aspect-square rounded-lg overflow-hidden bg-white/5">
+                  <div key={img.id} className="relative aspect-square rounded-lg overflow-hidden bg-om-surface">
                     <img src={img.url} alt={img.tag} className="w-full h-full object-cover" />
                     <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[10px] bg-black/60 text-white">{img.kind}</span>
                     <span className="absolute bottom-1 left-1 right-1 px-1.5 py-0.5 rounded text-[10px] bg-black/60 text-white truncate">{img.tag}</span>
@@ -228,19 +228,19 @@ function VisitRow({ visit, store, user, projectId }: { visit: MaintenanceVisit; 
 
           {/* Defect log */}
           <div>
-            <p className="text-[11px] uppercase tracking-wider text-white/40 mb-2 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Defect Log</p>
+            <p className="text-[11px] uppercase tracking-wider text-om-faint mb-2 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Defect Log</p>
             <div className="space-y-2">
               {visit.defects.map((d) => (
-                <div key={d.id} className="flex items-center gap-3 rounded-lg bg-white/5 px-3 py-2 text-sm">
+                <div key={d.id} className="flex items-center gap-3 rounded-lg bg-om-surface px-3 py-2 text-sm">
                   <button onClick={() => toggleDefect(visit.id, d.id, user)} className="flex-shrink-0">
                     {d.status === "Open" ? <Circle className="w-4 h-4 text-red-400" /> : <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
                   </button>
                   <Badge tone={d.category === "Soiling" ? "amber" : d.category === "Physical damage" ? "red" : "neutral"}>{d.category}</Badge>
-                  <span className="flex-1 text-white/80">{d.description}</span>
+                  <span className="flex-1 text-om-soft">{d.description}</span>
                   <Badge tone={d.status === "Open" ? "red" : "green"}>{d.status}</Badge>
                 </div>
               ))}
-              {visit.defects.length === 0 && <p className="text-xs text-white/40">No defects noted.</p>}
+              {visit.defects.length === 0 && <p className="text-xs text-om-faint">No defects noted.</p>}
             </div>
           </div>
 
@@ -262,12 +262,12 @@ function CompareView({ a, b }: { a: MaintenanceVisit; b: MaintenanceVisit }) {
         { label: "Visit A", v: a },
         { label: "Visit B", v: b },
       ].map(({ label, v }) => (
-        <div key={label} className="rounded-xl bg-white/5 p-4">
+        <div key={label} className="rounded-xl bg-om-surface p-4">
           <p className="font-semibold text-sm mb-2">{label}: {v.date}</p>
           <dl className="text-xs space-y-1 mb-3">
-            <div className="flex justify-between"><dt className="text-white/50">Cleaning</dt><dd>{v.cleaningType}</dd></div>
-            <div className="flex justify-between"><dt className="text-white/50">Weather</dt><dd>{v.weather}</dd></div>
-            <div className="flex justify-between"><dt className="text-white/50">Defects</dt><dd>{v.defects.filter((d) => d.status === "Open").length} open</dd></div>
+            <div className="flex justify-between"><dt className="text-om-subtle">Cleaning</dt><dd>{v.cleaningType}</dd></div>
+            <div className="flex justify-between"><dt className="text-om-subtle">Weather</dt><dd>{v.weather}</dd></div>
+            <div className="flex justify-between"><dt className="text-om-subtle">Defects</dt><dd>{v.defects.filter((d) => d.status === "Open").length} open</dd></div>
           </dl>
           {v.images.length > 0 && (
             <div className="grid grid-cols-3 gap-1.5">
@@ -359,8 +359,8 @@ function VisitForm({ open, onClose, project, user }: { open: boolean; onClose: (
         {/* Image upload */}
         <div className="grid sm:grid-cols-2 gap-3">
           {(["before", "after"] as const).map((kind) => (
-            <div key={kind} className="rounded-xl bg-white/5 border border-white/10 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-white/50 mb-2 flex items-center gap-1"><Camera className="w-3.5 h-3.5" /> {kind === "before" ? "Before" : "After"} images</p>
+            <div key={kind} className="rounded-xl bg-om-surface border border-om p-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-om-subtle mb-2 flex items-center gap-1"><Camera className="w-3.5 h-3.5" /> {kind === "before" ? "Before" : "After"} images</p>
               {images.filter((i) => i.kind === kind).map((img) => (
                 <div key={img.id} className="flex items-center gap-2 mb-2">
                   <img src={img.url} className="w-10 h-10 rounded object-cover" alt="" />
@@ -368,7 +368,7 @@ function VisitForm({ open, onClose, project, user }: { open: boolean; onClose: (
                   <button type="button" onClick={() => setImages((prev) => prev.filter((x) => x.id !== img.id))} className="text-red-400">✕</button>
                 </div>
               ))}
-              <label className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-white/20 text-xs text-white/60 hover:border-brand-500 cursor-pointer">
+              <label className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-om-strong text-xs text-om-muted hover:border-brand-500 cursor-pointer">
                 <Plus className="w-3 h-3" /> Upload {kind}
                 <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => uploadImages(e.target.files, kind, "")} />
               </label>
@@ -377,8 +377,8 @@ function VisitForm({ open, onClose, project, user }: { open: boolean; onClose: (
         </div>
 
         {/* Defect log */}
-        <div className="rounded-xl bg-white/5 border border-white/10 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">Defect Log</p>
+        <div className="rounded-xl bg-om-surface border border-om p-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-om-subtle mb-2">Defect Log</p>
           <div className="space-y-1.5 mb-3">
             {defects.map((d) => (
               <div key={d.id} className="flex items-center gap-2 text-sm">
