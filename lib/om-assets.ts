@@ -6,7 +6,8 @@ type UploadKind =
   | "thermal"
   | "report"
   | "layout"
-  | "processed";
+  | "processed"
+  | "document";
 
 export async function uploadOmAsset(file: File, projectId: string, kind: UploadKind): Promise<string> {
   const res = await fetch("/api/om/assets/sign-upload", {

@@ -267,7 +267,7 @@ async function hasSupabaseSession(): Promise<boolean> {
 }
 
 async function staffApiWrite(
-  path: "/api/om/clients" | "/api/om/projects" | "/api/om/inspections",
+  path: "/api/om/clients" | "/api/om/projects" | "/api/om/inspections" | "/api/om/docs",
   method: "POST" | "PATCH",
   body: Record<string, unknown>
 ): Promise<any> {
@@ -285,7 +285,7 @@ async function staffApiWrite(
 
 /** DELETE with id in query string — reliable on Vercel (request bodies on DELETE often drop). */
 async function staffApiDelete(
-  path: "/api/om/clients" | "/api/om/projects",
+  path: "/api/om/clients" | "/api/om/projects" | "/api/om/docs",
   id: string
 ): Promise<void> {
   const res = await fetch(`${path}?id=${encodeURIComponent(id)}`, { method: "DELETE" });
@@ -1296,31 +1296,41 @@ export function parsePerformanceCsv(text: string): { date: string; energyKWh: nu
 /* ================ Module 6: Documents + audit ===================== */
 
 export async function addDoc(input: Omit<VaultDoc, "id" | "uploadedAt">, user: User) {
-  const { data, error } = await supabase
-    .from("docs")
-    .insert({
-      project_id: input.projectId,
-      name: input.name,
-      type: input.type,
-      url: input.url,
-      uploaded_by: input.uploadedBy,
-    })
-    .select()
-    .single();
-  if (error) throw error;
+  const row = {
+    project_id: input.projectId,
+    name: input.name,
+    type: input.type,
+    url: input.url,
+    uploaded_by: input.uploadedBy,
+  };
+
+  let saved: { id: string; uploaded_at: string };
+  if (isSupabaseConfigured()) {
+    const payload = (await staffApiWrite("/api/om/docs", "POST", row)) as {
+      doc?: { id: string; uploaded_at: string };
+    } | null;
+    if (!payload?.doc) throw new Error("Document was not saved.");
+    saved = payload.doc;
+  } else {
+    saved = { id: uid("doc"), uploaded_at: nowISO() };
+  }
+
   await mutate((s) => {
-    s.docs.push({ ...input, id: data.id, uploadedAt: data.uploaded_at });
+    s.docs = s.docs.filter((d) => d.id !== saved.id);
+    s.docs.push({ ...input, id: saved.id, uploadedAt: saved.uploaded_at });
     s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "upload", target: `Doc ${input.name}` });
-  });
-  return getStore().docs.find((d) => d.id === data.id)!;
+  }, true, { syncAfter: false });
+  return getStore().docs.find((d) => d.id === saved.id)!;
 }
 
 export async function deleteDoc(id: string, user: User) {
-  await supabase.from("docs").delete().eq("id", id);
+  if (isSupabaseConfigured()) {
+    await staffApiDelete("/api/om/docs", id);
+  }
   await mutate((s) => {
     s.docs = s.docs.filter((d) => d.id !== id);
     s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "delete", target: `Doc ${id}` });
-  });
+  }, true, { syncAfter: false });
 }
 
 export function docsFor(projectId: string): VaultDoc[] {

@@ -16,6 +16,7 @@ import {
   Calendar,
 } from "lucide-react";
 import type { User } from "@/lib/auth";
+import { uploadOmAsset } from "@/lib/om-assets";
 import {
   type Store,
   type DocType,
@@ -46,7 +47,6 @@ import {
   Modal,
   EmptyState,
   Stat,
-  fileToDataUrl,
 } from "../ui";
 import { ProjectPicker } from "./ProjectPicker";
 
@@ -59,6 +59,20 @@ const DOC_TONE: Record<DocType, "amber" | "purple" | "blue" | "green" | "neutral
   Report: "neutral",
   Other: "neutral",
 };
+
+async function downloadDocUrl(url: string, fileName: string) {
+  if (!url || url === "#") return;
+  const blob = await fetch(url).then((res) => {
+    if (!res.ok) throw new Error(`Could not download ${fileName}`);
+    return res.blob();
+  });
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(objectUrl);
+}
 
 export default function ReportsView({
   user,
@@ -145,10 +159,24 @@ export default function ReportsView({
                 <span className="flex-1 truncate text-om-fg">{d.name}</span>
                 <span className="text-xs text-om-faint hidden sm:inline">by {d.uploadedBy}</span>
                 <span className="text-xs text-om-faint">{new Date(d.uploadedAt).toLocaleDateString()}</span>
+                {d.url && d.url !== "#" && (
+                  <a
+                    href={d.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-semibold text-brand-400 hover:text-brand-300"
+                  >
+                    View
+                  </a>
+                )}
                 <button
-                  onClick={() => logAudit(user, "download", `Doc ${d.name}`)}
-                  className="text-brand-400 hover:text-brand-300"
+                  onClick={async () => {
+                    await downloadDocUrl(d.url, d.name);
+                    await logAudit(user, "download", `Doc ${d.name}`);
+                  }}
+                  className="text-brand-400 hover:text-brand-300 disabled:opacity-40"
                   title="Download"
+                  disabled={!d.url || d.url === "#"}
                 >
                   <Download className="w-4 h-4" />
                 </button>
@@ -218,20 +246,40 @@ function UploadDoc({ open, onClose, project, user }: { open: boolean; onClose: (
   const [name, setName] = useState("");
   const [type, setType] = useState<DocType>("Warranty");
   const [url, setUrl] = useState<string>();
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addDoc(
-      {
-        projectId: project.id,
-        name: name || "Untitled.pdf",
-        type,
-        url: url ?? "#",
-        uploadedBy: user.email,
-      },
-      user
-    );
-    onClose();
+    if (uploading) {
+      setError("Please wait for the file upload to finish.");
+      return;
+    }
+    if (!url) {
+      setError("Choose a file before uploading the document.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await addDoc(
+        {
+          projectId: project.id,
+          name: name || "Untitled.pdf",
+          type,
+          url,
+          uploadedBy: user.email,
+        },
+        user
+      );
+      onClose();
+    } catch (err) {
+      console.error("Document save failed:", err);
+      setError(err instanceof Error ? err.message : "Could not save document.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -251,19 +299,38 @@ function UploadDoc({ open, onClose, project, user }: { open: boolean; onClose: (
             <input
               type="file"
               className="hidden"
+              disabled={uploading || saving}
               onChange={async (e) => {
                 const f = e.target.files?.[0];
                 if (f) {
-                  setUrl(await fileToDataUrl(f));
-                  if (!name) setName(f.name);
+                  setUploading(true);
+                  setError("");
+                  try {
+                    const uploadedUrl = await uploadOmAsset(f, project.id, "document");
+                    setUrl(uploadedUrl);
+                    if (!name) setName(f.name);
+                  } catch (err) {
+                    console.error("Document upload failed:", err);
+                    setError(err instanceof Error ? err.message : "Upload failed.");
+                  } finally {
+                    setUploading(false);
+                    e.currentTarget.value = "";
+                  }
                 }
               }}
             />
           </label>
         </Field>
+        {error && (
+          <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
         <div className="flex gap-2 pt-2">
-          <Button type="submit" className="flex-1">Upload</Button>
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button type="submit" className="flex-1" disabled={uploading || saving}>
+            {saving ? "Saving..." : uploading ? "Uploading..." : "Upload"}
+          </Button>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={uploading || saving}>Cancel</Button>
         </div>
       </form>
     </Modal>
