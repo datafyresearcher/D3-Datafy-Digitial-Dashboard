@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   FolderKanban,
   Plus,
@@ -348,6 +348,17 @@ function ProjectForm({
     }
   );
   const [newZone, setNewZone] = useState<StringZone>({ id: "", name: "", panelCount: 0, location: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  // Clients load asynchronously from Supabase; keep clientId in sync once they arrive.
+  useEffect(() => {
+    if (project) return;
+    const hasValidClient = store.clients.some((c) => c.id === form.clientId);
+    if (!hasValidClient && store.clients[0]?.id) {
+      setForm((current) => ({ ...current, clientId: store.clients[0].id }));
+    }
+  }, [store.clients, project, form.clientId]);
 
   const addZone = () => {
     if (!newZone.name) return;
@@ -374,16 +385,31 @@ function ProjectForm({
     });
   };
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (project) {
-      updateProject(project.id, form, user);
-    } else {
-      const { id, ...rest } = form;
-      void id;
-      createProject(rest, user);
+    setFormError("");
+
+    if (!form.clientId) {
+      setFormError("Select a client for this project.");
+      return;
     }
-    onClose();
+
+    setSubmitting(true);
+    try {
+      if (project) {
+        await updateProject(project.id, form, user);
+      } else {
+        const { id, ...rest } = form;
+        void id;
+        await createProject(rest, user);
+      }
+      onClose();
+    } catch (err) {
+      console.error("Project save failed:", err);
+      setFormError("Could not save the project. Please check the form and try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -394,8 +420,17 @@ function ProjectForm({
             <Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </Field>
           <Field label="Client">
-            <Select value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })}>
-              {store.clients.map((c) => <option key={c.id} value={c.id}>{c.company}</option>)}
+            <Select
+              required
+              value={form.clientId}
+              onChange={(e) => setForm({ ...form, clientId: e.target.value })}
+              disabled={store.clients.length === 0}
+            >
+              {store.clients.length === 0 ? (
+                <option value="">Loading clients…</option>
+              ) : (
+                store.clients.map((c) => <option key={c.id} value={c.id}>{c.company}</option>)
+              )}
             </Select>
           </Field>
           <Field label="Site address">
@@ -532,9 +567,19 @@ function ProjectForm({
           <Textarea rows={3} value={form.clientNotes} onChange={(e) => setForm({ ...form, clientNotes: e.target.value })} placeholder="Notes shared with the client…" />
         </Field>
 
+        {formError && (
+          <p className="text-sm text-red-400" role="alert">{formError}</p>
+        )}
+
         <div className="flex gap-2 pt-2">
-          <Button type="submit" className="flex-1">{project ? "Save changes" : "Create project"}</Button>
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button
+            type="submit"
+            className="flex-1"
+            disabled={submitting || store.clients.length === 0 || !form.clientId}
+          >
+            {submitting ? "Saving…" : project ? "Save changes" : "Create project"}
+          </Button>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>Cancel</Button>
         </div>
       </form>
     </Modal>

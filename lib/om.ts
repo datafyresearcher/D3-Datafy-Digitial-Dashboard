@@ -654,6 +654,10 @@ export async function createProject(
     Partial<Pick<Project, "stringZones" | "gallery" | "clientNotes" | "maintenanceSchedule">>,
   user: User
 ) {
+  if (!input.clientId?.trim()) {
+    throw new Error("A client must be selected before creating a project.");
+  }
+
   const id = uid("p");
   const project: Project = {
     stringZones: [],
@@ -663,32 +667,35 @@ export async function createProject(
     ...input,
     id,
   };
-  const { error } = await supabase.from("projects").insert({
-    id,
-    client_id: project.clientId,
-    name: project.name,
-    address: project.address,
-    lat: project.lat,
-    lng: project.lng,
-    size_kwp: project.sizeKWp,
-    panel_count: project.panelCount,
-    inverter_brand: project.inverterBrand,
-    inverter_model: project.inverterModel,
-    has_battery: project.hasBattery,
-    battery_system: project.batterySystem ?? null,
-    grid_type: project.gridType,
-    installed_at: project.installedAt,
-    warranty_expiry: project.warrantyExpiry,
-    site_contact_name: project.siteContactName,
-    site_contact_phone: project.siteContactPhone,
-    classification: project.classification,
-    status: project.status,
-    string_zones: project.stringZones,
-    gallery: project.gallery,
-    client_notes: project.clientNotes,
-    maintenance_schedule: project.maintenanceSchedule,
-  });
-  if (error) throw error;
+
+  if (await hasSupabaseSession()) {
+    const { error } = await supabase.from("projects").insert({
+      id,
+      client_id: project.clientId,
+      name: project.name,
+      address: project.address || "—",
+      lat: project.lat,
+      lng: project.lng,
+      size_kwp: project.sizeKWp,
+      panel_count: project.panelCount,
+      inverter_brand: project.inverterBrand,
+      inverter_model: project.inverterModel,
+      has_battery: project.hasBattery,
+      battery_system: project.batterySystem?.trim() ? project.batterySystem : null,
+      grid_type: project.gridType,
+      installed_at: project.installedAt,
+      warranty_expiry: project.warrantyExpiry,
+      site_contact_name: project.siteContactName,
+      site_contact_phone: project.siteContactPhone,
+      classification: project.classification,
+      status: project.status,
+      string_zones: project.stringZones,
+      gallery: project.gallery,
+      client_notes: project.clientNotes,
+      maintenance_schedule: project.maintenanceSchedule,
+    });
+    if (error) throw error;
+  }
   await mutate((s) => {
     s.projects.push(project);
     s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "create", target: `Project ${project.name}` });
