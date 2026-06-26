@@ -267,10 +267,10 @@ async function hasSupabaseSession(): Promise<boolean> {
 }
 
 async function staffApiWrite(
-  path: "/api/om/clients" | "/api/om/projects",
+  path: "/api/om/clients" | "/api/om/projects" | "/api/om/inspections",
   method: "POST" | "PATCH",
   body: Record<string, unknown>
-): Promise<void> {
+): Promise<any> {
   const res = await fetch(path, {
     method,
     headers: { "Content-Type": "application/json" },
@@ -280,6 +280,7 @@ async function staffApiWrite(
     const payload = (await res.json().catch(() => null)) as { error?: string } | null;
     throw new Error(payload?.error ?? `Could not save via ${path}.`);
   }
+  return res.json().catch(() => null);
 }
 
 /** DELETE with id in query string — reliable on Vercel (request bodies on DELETE often drop). */
@@ -1124,42 +1125,45 @@ export function healthScore(project: Project): number {
 /* ================ Module 4: Drone inspections ===================== */
 
 export async function addInspection(input: Omit<DroneInspection, "id" | "createdAt">, user: User) {
-  const { data, error } = await supabase
-    .from("inspections")
-    .insert({
-      project_id: input.projectId,
-      date: input.date,
-      orthomosaic_url: input.orthomosaicUrl ?? null,
-      rgb_url: input.rgbUrl ?? null,
-      thermal_url: input.thermalUrl ?? null,
-      report_pdf_url: input.reportPdfUrl ?? null,
-      processed_images: input.processedImages,
-      layout_url: input.layoutUrl ?? null,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  if (input.anomalies.length) {
-    await supabase.from("anomalies").insert(
-      input.anomalies.map((a) => ({
-        inspection_id: data.id,
-        panel_id: a.panelId,
-        type: a.type,
-        severity: a.severity,
-        status: a.status,
-        detected_at: a.detectedAt,
-        resolved_at: a.resolvedAt ?? null,
-        x: a.x ?? null,
-        y: a.y ?? null,
-        note: a.note ?? null,
-      }))
-    );
+  const row = {
+    project_id: input.projectId,
+    date: input.date,
+    orthomosaic_url: input.orthomosaicUrl ?? null,
+    rgb_url: input.rgbUrl ?? null,
+    thermal_url: input.thermalUrl ?? null,
+    report_pdf_url: input.reportPdfUrl ?? null,
+    processed_images: input.processedImages,
+    layout_url: input.layoutUrl ?? null,
+    anomalies: input.anomalies.map((a) => ({
+      panel_id: a.panelId,
+      type: a.type,
+      severity: a.severity,
+      status: a.status,
+      detected_at: a.detectedAt,
+      resolved_at: a.resolvedAt ?? null,
+      x: a.x ?? null,
+      y: a.y ?? null,
+      note: a.note ?? null,
+    })),
+  };
+
+  let saved: { id: string; created_at: string };
+  if (isSupabaseConfigured()) {
+    const payload = (await staffApiWrite("/api/om/inspections", "POST", row)) as {
+      inspection?: { id: string; created_at: string };
+    } | null;
+    if (!payload?.inspection) throw new Error("Inspection was not saved.");
+    saved = payload.inspection;
+  } else {
+    saved = { id: uid("ins"), created_at: nowISO() };
   }
+
   await mutate((s) => {
-    s.inspections.push({ ...input, id: data.id, createdAt: data.created_at });
+    s.inspections = s.inspections.filter((i) => i.id !== saved.id);
+    s.inspections.push({ ...input, id: saved.id, createdAt: saved.created_at });
     s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "upload", target: `Inspection ${input.date} (${input.projectId})` });
-  });
-  return getStore().inspections.find((i) => i.id === data.id)!;
+  }, true, { syncAfter: false });
+  return getStore().inspections.find((i) => i.id === saved.id)!;
 }
 
 export async function updateInspection(id: string, patch: Partial<DroneInspection>) {

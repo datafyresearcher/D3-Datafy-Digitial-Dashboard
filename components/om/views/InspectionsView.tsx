@@ -35,6 +35,7 @@ import {
   uid,
 } from "@/lib/om";
 import { logAudit } from "@/lib/om";
+import { uploadOmAsset } from "@/lib/om-assets";
 import { canUpload } from "../perms";
 import {
   Button,
@@ -48,7 +49,6 @@ import {
   Modal,
   EmptyState,
   Stat,
-  fileToDataUrl,
 } from "../ui";
 import { ProjectPicker } from "./ProjectPicker";
 
@@ -410,38 +410,56 @@ function InspectionForm({ open, onClose, project, user }: { open: boolean; onClo
   const [reportPdf, setReportPdf] = useState<string>();
   const [layout, setLayout] = useState<string>();
   const [processed, setProcessed] = useState<{ id: string; url: string; label: string }[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  const toDataUrl = async (files: FileList | null) => {
+  const uploadAsset = async (
+    files: FileList | null,
+    kind: "orthomosaic" | "rgb" | "thermal" | "report" | "layout"
+  ) => {
     if (!files || !files[0]) return undefined;
-    return fileToDataUrl(files[0]);
+    return uploadOmAsset(files[0], project.id, kind);
   };
 
   const uploadProcessed = async (files: FileList | null) => {
     if (!files) return;
     const out: { id: string; url: string; label: string }[] = [];
     for (const f of Array.from(files)) {
-      out.push({ id: uid("proc"), url: await fileToDataUrl(f), label: f.name.replace(/\.[^.]+$/, "") });
+      out.push({
+        id: uid("proc"),
+        url: await uploadOmAsset(f, project.id, "processed"),
+        label: f.name.replace(/\.[^.]+$/, ""),
+      });
     }
     setProcessed((p) => [...p, ...out]);
   };
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addInspection(
-      {
-        projectId: project.id,
-        date,
-        orthomosaicUrl: orthomosaic,
-        rgbUrl: rgb,
-        thermalUrl: thermal,
-        reportPdfUrl: reportPdf,
-        layoutUrl: layout,
-        processedImages: processed,
-        anomalies: [],
-      },
-      user
-    );
-    onClose();
+    setSaving(true);
+    setError("");
+    try {
+      await addInspection(
+        {
+          projectId: project.id,
+          date,
+          orthomosaicUrl: orthomosaic,
+          rgbUrl: rgb,
+          thermalUrl: thermal,
+          reportPdfUrl: reportPdf,
+          layoutUrl: layout,
+          processedImages: processed,
+          anomalies: [],
+        },
+        user
+      );
+      onClose();
+    } catch (err) {
+      console.error("Inspection save failed:", err);
+      setError(err instanceof Error ? err.message : "Could not save inspection.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -450,11 +468,11 @@ function InspectionForm({ open, onClose, project, user }: { open: boolean; onClo
         <Field label="Inspection date"><Input type="date" required value={date} onChange={(e) => setDate(e.target.value)} /></Field>
 
         <div className="grid sm:grid-cols-2 gap-3">
-          <UploadField label="Orthomosaic (GeoTIFF/JPG)" icon={FileImage} value={orthomosaic} onChange={async (f) => setOrthomosaic(await toDataUrl(f))} />
-          <UploadField label="Raw RGB imagery" icon={ImageIcon} value={rgb} onChange={async (f) => setRgb(await toDataUrl(f))} />
-          <UploadField label="Thermal imagery" icon={Thermometer} value={thermal} onChange={async (f) => setThermal(await toDataUrl(f))} />
-          <UploadField label="Collection Report PDF" icon={FileText} value={reportPdf} onChange={async (f) => setReportPdf(await toDataUrl(f))} />
-          <UploadField label="Plant layout image" icon={MapPin} value={layout} onChange={async (f) => setLayout(await toDataUrl(f))} />
+          <UploadField label="Orthomosaic (GeoTIFF/JPG)" icon={FileImage} value={orthomosaic} onChange={async (f) => setOrthomosaic(await uploadAsset(f, "orthomosaic"))} />
+          <UploadField label="Raw RGB imagery" icon={ImageIcon} value={rgb} onChange={async (f) => setRgb(await uploadAsset(f, "rgb"))} />
+          <UploadField label="Thermal imagery" icon={Thermometer} value={thermal} onChange={async (f) => setThermal(await uploadAsset(f, "thermal"))} />
+          <UploadField label="Collection Report PDF" icon={FileText} value={reportPdf} onChange={async (f) => setReportPdf(await uploadAsset(f, "report"))} />
+          <UploadField label="Plant layout image" icon={MapPin} value={layout} onChange={async (f) => setLayout(await uploadAsset(f, "layout"))} />
         </div>
 
         <div className="rounded-xl bg-om-surface border border-om p-4">
@@ -474,10 +492,17 @@ function InspectionForm({ open, onClose, project, user }: { open: boolean; onClo
         </div>
 
         <p className="text-xs text-om-faint">Anomalies can be pinned on the plant layout after upload.</p>
+        {error && (
+          <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
 
         <div className="flex gap-2 pt-2">
-          <Button type="submit" className="flex-1">Save Inspection</Button>
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button type="submit" className="flex-1" disabled={saving}>
+            {saving ? "Saving..." : "Save Inspection"}
+          </Button>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
         </div>
       </form>
     </Modal>
@@ -493,8 +518,11 @@ function UploadField({
   label: string;
   icon: typeof FileImage;
   value?: string;
-  onChange: (f: FileList | null) => void;
+  onChange: (f: FileList | null) => Promise<void> | void;
 }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+
   return (
     <div>
       <p className="text-xs font-semibold uppercase tracking-wider text-om-subtle mb-1.5 flex items-center gap-1.5">
@@ -502,8 +530,27 @@ function UploadField({
       </p>
       <label className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-om-strong text-sm text-om-muted hover:border-brand-500 cursor-pointer transition-colors">
         {value ? <span className="text-emerald-400 text-xs">✓ Uploaded</span> : <span>Choose file…</span>}
-        <input type="file" className="hidden" onChange={(e) => onChange(e.target.files)} />
+        <input
+          type="file"
+          className="hidden"
+          disabled={uploading}
+          onChange={async (e) => {
+            setUploading(true);
+            setError("");
+            try {
+              await onChange(e.target.files);
+            } catch (err) {
+              console.error("Asset upload failed:", err);
+              setError(err instanceof Error ? err.message : "Upload failed.");
+            } finally {
+              setUploading(false);
+              e.currentTarget.value = "";
+            }
+          }}
+        />
       </label>
+      {uploading && <p className="mt-1 text-xs text-brand-300">Uploading to Supabase Storage...</p>}
+      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
     </div>
   );
 }
