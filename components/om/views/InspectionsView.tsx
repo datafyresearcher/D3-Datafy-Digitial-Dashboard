@@ -65,6 +65,33 @@ const SEV_COLOR: Record<AnomalySeverity, string> = {
   Info: "#0ea5e9",
 };
 
+function isImageAsset(url: string) {
+  return /\.(png|jpe?g|webp|gif|bmp)$/i.test(url.split("?")[0]) || url.startsWith("data:image/");
+}
+
+function assetFileName(url: string, fallback: string) {
+  if (url.startsWith("data:")) return fallback;
+  try {
+    const path = new URL(url).pathname;
+    return decodeURIComponent(path.split("/").pop() || fallback);
+  } catch {
+    return fallback;
+  }
+}
+
+async function downloadAssetUrl(url: string, fileName: string) {
+  const blob = await fetch(url).then((res) => {
+    if (!res.ok) throw new Error(`Could not download ${fileName}`);
+    return res.blob();
+  });
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(objectUrl);
+}
+
 export default function InspectionsView({
   user,
   store,
@@ -233,6 +260,45 @@ function InspectionDetail({ open, onClose, inspection, user }: { open: boolean; 
   return (
     <Modal open={open} onClose={onClose} title={`Inspection — ${inspection.date}`} wide>
       <div className="space-y-5">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-om-subtle mb-2">Uploaded Assets</p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {inspection.orthomosaicUrl && (
+              <AssetTile
+                title="Orthomosaic"
+                icon={FileImage}
+                url={inspection.orthomosaicUrl}
+                fallbackName={`orthomosaic-${inspection.date}.jpg`}
+              />
+            )}
+            {inspection.rgbUrl && (
+              <AssetTile title="Raw RGB" icon={ImageIcon} url={inspection.rgbUrl} fallbackName={`rgb-${inspection.date}.jpg`} />
+            )}
+            {inspection.thermalUrl && (
+              <AssetTile
+                title="Thermal Imagery"
+                icon={Thermometer}
+                url={inspection.thermalUrl}
+                fallbackName={`thermal-${inspection.date}.jpg`}
+              />
+            )}
+            {inspection.reportPdfUrl && (
+              <AssetTile
+                title="Collection Report"
+                icon={FileText}
+                url={inspection.reportPdfUrl}
+                fallbackName={`report-${inspection.date}.pdf`}
+              />
+            )}
+            {inspection.layoutUrl && (
+              <AssetTile title="Plant Layout" icon={MapPin} url={inspection.layoutUrl} fallbackName={`layout-${inspection.date}.jpg`} />
+            )}
+          </div>
+          {!inspection.orthomosaicUrl && !inspection.rgbUrl && !inspection.thermalUrl && !inspection.reportPdfUrl && !inspection.layoutUrl && (
+            <p className="text-xs text-om-faint py-2">No uploaded asset links are saved for this inspection.</p>
+          )}
+        </div>
+
         {/* Processed imagery */}
         {inspection.processedImages.length > 0 && (
           <div>
@@ -331,6 +397,60 @@ function InspectionDetail({ open, onClose, inspection, user }: { open: boolean; 
   );
 }
 
+function AssetTile({
+  title,
+  icon: Icon,
+  url,
+  fallbackName,
+}: {
+  title: string;
+  icon: typeof FileImage;
+  url: string;
+  fallbackName: string;
+}) {
+  const fileName = assetFileName(url, fallbackName);
+  const image = isImageAsset(url);
+
+  return (
+    <div className="rounded-xl bg-om-surface border border-om overflow-hidden">
+      {image ? (
+        <a href={url} target="_blank" rel="noreferrer" className="block aspect-video bg-om-bg overflow-hidden">
+          <img src={url} alt={title} className="w-full h-full object-cover" />
+        </a>
+      ) : (
+        <div className="aspect-video grid place-items-center bg-om-bg text-om-muted">
+          <Icon className="w-8 h-8" />
+        </div>
+      )}
+      <div className="p-3 space-y-2">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-om-fg flex items-center gap-1.5">
+            <Icon className="w-4 h-4 text-brand-400" /> {title}
+          </p>
+          <p className="text-xs text-om-subtle truncate" title={fileName}>{fileName}</p>
+        </div>
+        <div className="flex gap-2">
+          <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-om-surface-hover px-3 py-1.5 text-xs font-semibold text-om-soft hover:text-om-fg"
+          >
+            View
+          </a>
+          <button
+            type="button"
+            onClick={() => downloadAssetUrl(url, fileName)}
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-500"
+          >
+            <Download className="w-3.5 h-3.5" /> Download
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CompareInspections({ open, onClose, inspections }: { open: boolean; onClose: () => void; inspections: DroneInspection[] }) {
   const sorted = [...inspections].sort((a, b) => (a.date < b.date ? -1 : 1));
   const [aId, setAId] = useState(sorted[0]?.id ?? "");
@@ -412,30 +532,45 @@ function InspectionForm({ open, onClose, project, user }: { open: boolean; onClo
   const [processed, setProcessed] = useState<{ id: string; url: string; label: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [uploadingCount, setUploadingCount] = useState(0);
 
   const uploadAsset = async (
     files: FileList | null,
     kind: "orthomosaic" | "rgb" | "thermal" | "report" | "layout"
   ) => {
     if (!files || !files[0]) return undefined;
-    return uploadOmAsset(files[0], project.id, kind);
+    setUploadingCount((count) => count + 1);
+    try {
+      return await uploadOmAsset(files[0], project.id, kind);
+    } finally {
+      setUploadingCount((count) => Math.max(0, count - 1));
+    }
   };
 
   const uploadProcessed = async (files: FileList | null) => {
     if (!files) return;
     const out: { id: string; url: string; label: string }[] = [];
     for (const f of Array.from(files)) {
+      setUploadingCount((count) => count + 1);
+      try {
       out.push({
         id: uid("proc"),
         url: await uploadOmAsset(f, project.id, "processed"),
         label: f.name.replace(/\.[^.]+$/, ""),
       });
+      } finally {
+        setUploadingCount((count) => Math.max(0, count - 1));
+      }
     }
     setProcessed((p) => [...p, ...out]);
   };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (uploadingCount > 0) {
+      setError("Please wait for file uploads to finish before saving the inspection.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -499,8 +634,8 @@ function InspectionForm({ open, onClose, project, user }: { open: boolean; onClo
         )}
 
         <div className="flex gap-2 pt-2">
-          <Button type="submit" className="flex-1" disabled={saving}>
-            {saving ? "Saving..." : "Save Inspection"}
+          <Button type="submit" className="flex-1" disabled={saving || uploadingCount > 0}>
+            {saving ? "Saving..." : uploadingCount > 0 ? "Uploading files..." : "Save Inspection"}
           </Button>
           <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
         </div>
@@ -572,22 +707,23 @@ async function downloadPackage(ins: DroneInspection, user: User) {
     `Anomalies: ${ins.anomalies.length} (${ins.anomalies.filter((a) => a.status === "Open").length} open)`,
     ``,
     `Assets:`,
-    ins.orthomosaicUrl ? `- orthomosaic.png` : "",
-    ins.rgbUrl ? `- rgb.png` : "",
-    ins.thermalUrl ? `- thermal.png` : "",
-    ins.layoutUrl ? `- layout.png` : "",
+    ins.orthomosaicUrl ? `- orthomosaic: ${ins.orthomosaicUrl}` : "",
+    ins.rgbUrl ? `- rgb: ${ins.rgbUrl}` : "",
+    ins.thermalUrl ? `- thermal: ${ins.thermalUrl}` : "",
+    ins.reportPdfUrl ? `- report: ${ins.reportPdfUrl}` : "",
+    ins.layoutUrl ? `- layout: ${ins.layoutUrl}` : "",
     ins.processedImages.length ? `- processed/ (${ins.processedImages.length} overlays)` : "",
   ].join("\n");
   zip.file("MANIFEST.txt", manifest);
 
-  // embed images (data URLs -> blobs)
-  if (ins.orthomosaicUrl?.startsWith("data:")) zip.file("orthomosaic.png", await dataToBlob(ins.orthomosaicUrl));
-  if (ins.rgbUrl?.startsWith("data:")) zip.file("rgb.png", await dataToBlob(ins.rgbUrl));
-  if (ins.thermalUrl?.startsWith("data:")) zip.file("thermal.png", await dataToBlob(ins.thermalUrl));
-  if (ins.layoutUrl?.startsWith("data:")) zip.file("layout.png", await dataToBlob(ins.layoutUrl));
+  await addAssetToZip(zip, ins.orthomosaicUrl, "orthomosaic.jpg");
+  await addAssetToZip(zip, ins.rgbUrl, "rgb.jpg");
+  await addAssetToZip(zip, ins.thermalUrl, "thermal.jpg");
+  await addAssetToZip(zip, ins.reportPdfUrl, "report.pdf");
+  await addAssetToZip(zip, ins.layoutUrl, "layout.jpg");
   const folder = zip.folder("processed");
   for (const p of ins.processedImages) {
-    if (p.url.startsWith("data:")) folder?.file(`${p.label}.png`, await dataToBlob(p.url));
+    await addAssetToZip(folder, p.url, `${p.label}.png`);
   }
 
   logAudit(user, "download", `Inspection package ${ins.date}`);
@@ -604,4 +740,18 @@ async function downloadPackage(ins: DroneInspection, user: User) {
 async function dataToBlob(dataUrl: string): Promise<Blob> {
   const res = await fetch(dataUrl);
   return res.blob();
+}
+
+async function addAssetToZip(folder: JSZip | null, url: string | undefined, fallbackName: string) {
+  if (!folder || !url) return;
+  try {
+    const blob = url.startsWith("data:") ? await dataToBlob(url) : await fetch(url).then((res) => {
+      if (!res.ok) throw new Error(`Could not fetch ${url}`);
+      return res.blob();
+    });
+    folder.file(assetFileName(url, fallbackName), blob);
+  } catch (err) {
+    console.warn("Could not include asset in ZIP:", err);
+    folder.file(`${fallbackName}.url.txt`, url);
+  }
 }
