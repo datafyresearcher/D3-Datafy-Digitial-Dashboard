@@ -32,6 +32,13 @@ export function getSupabaseAdmin(): SupabaseClient {
   }
 
   adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    global: {
+      fetch: (input, init) =>
+        fetch(input, {
+          ...init,
+          cache: "no-store",
+        }),
+    },
     auth: {
       persistSession: false,
       autoRefreshToken: false,

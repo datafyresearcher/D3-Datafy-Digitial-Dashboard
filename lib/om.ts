@@ -781,12 +781,27 @@ export async function resetStore(): Promise<void> {
   emit();
 }
 
-/** Mutate the cache locally then reload from server so it stays in sync. */
-async function mutate(localFn: (s: Store) => void, staffSync = false): Promise<void> {
+/**
+ * Mutate the cache locally, then optionally reload from the server.
+ *
+ * Client/project writes already went through the server API. On Vercel, a
+ * follow-up store read can briefly return the previous snapshot, which makes
+ * successful creates vanish and successful deletes reappear. Those mutations
+ * skip the immediate refetch and keep the confirmed local state.
+ */
+async function mutate(
+  localFn: (s: Store) => void,
+  staffSync = false,
+  options: { syncAfter?: boolean } = {}
+): Promise<void> {
   invalidatePendingSyncs();
   if (!cache) cache = emptyStore();
   localFn(cache);
   publishStore(); // optimistic UI update (new snapshot reference)
+  if (options.syncAfter === false) {
+    if (!isSupabaseConfigured()) persistLocalStore(cache);
+    return;
+  }
   await syncStoreFromServer(staffSync);
 }
 
@@ -864,6 +879,7 @@ export async function createClient(input: Omit<Client, "id" | "createdAt" | "act
   // In local (!configured) mode the mutate below + persistLocalStore handles persistence.
 
   await mutate((s) => {
+    s.clients = s.clients.filter((c) => c.id !== client.id);
     s.clients.push(client);
     s.audit.unshift({
       id: uid(),
@@ -873,7 +889,7 @@ export async function createClient(input: Omit<Client, "id" | "createdAt" | "act
       action: "create",
       target: `Client ${input.company}`,
     });
-  }, true);
+  }, true, { syncAfter: false });
   return client;
 }
 
@@ -892,7 +908,7 @@ export async function updateClient(id: string, patch: Partial<Client>, user: Use
     const c = s.clients.find((x) => x.id === id);
     if (c) Object.assign(c, patch);
     s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "edit", target: `Client ${id}` });
-  }, true);
+  }, true, { syncAfter: false });
 }
 
 export async function deleteClient(id: string, user: User) {
@@ -905,7 +921,7 @@ export async function deleteClient(id: string, user: User) {
     s.clients = s.clients.filter((c) => c.id !== id);
     s.projects = s.projects.filter((p) => p.clientId !== id);
     s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "delete", target: `Client ${id}` });
-  }, true);
+  }, true, { syncAfter: false });
 }
 
 /* =================== Module 2: Projects CRUD ======================= */
@@ -943,9 +959,10 @@ export async function createProject(
     await staffApiWrite("/api/om/projects", "POST", row);
   }
   await mutate((s) => {
+    s.projects = s.projects.filter((p) => p.id !== project.id);
     s.projects.push(project);
     s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "create", target: `Project ${project.name}` });
-  }, true);
+  }, true, { syncAfter: false });
   return project;
 }
 
@@ -964,7 +981,7 @@ export async function updateProject(id: string, patch: Partial<Project>, user: U
     const p = s.projects.find((x) => x.id === id);
     if (p) Object.assign(p, patch);
     s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "edit", target: `Project ${id}` });
-  }, true);
+  }, true, { syncAfter: false });
 }
 
 export async function deleteProject(id: string, user: User) {
@@ -980,7 +997,7 @@ export async function deleteProject(id: string, user: User) {
     s.performance = s.performance.filter((r) => r.projectId !== id);
     s.docs = s.docs.filter((d) => d.projectId !== id);
     s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "delete", target: `Project ${id}` });
-  }, true);
+  }, true, { syncAfter: false });
 }
 
 /* =================== Module 3: Visits + defects ==================== */

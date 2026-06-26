@@ -15,11 +15,14 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { error } = await getSupabaseAdmin().from("projects").insert(body);
+    const { data, error } = await getSupabaseAdmin().from("projects").insert(body).select().single();
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(
+      { ok: true, project: data },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
+    );
   } catch (err) {
     console.error("POST /api/om/projects:", err);
     return NextResponse.json({ error: "Failed to save project." }, { status: 500 });
@@ -42,7 +45,10 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Project id is required." }, { status: 400 });
     }
     await deleteOmProjectTree(getSupabaseAdmin(), id);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(
+      { ok: true },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
+    );
   } catch (err) {
     console.error("DELETE /api/om/projects:", err);
     return NextResponse.json(
@@ -63,11 +69,19 @@ export async function PATCH(request: Request) {
     if (!id) {
       return NextResponse.json({ error: "Project id is required." }, { status: 400 });
     }
-    const { error } = await getSupabaseAdmin().from("projects").update(row).eq("id", id);
+    const { data, error } = await getSupabaseAdmin()
+      .from("projects")
+      .update(row)
+      .eq("id", id)
+      .select()
+      .single();
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(
+      { ok: true, project: data },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
+    );
   } catch (err) {
     console.error("PATCH /api/om/projects:", err);
     return NextResponse.json({ error: "Failed to update project." }, { status: 500 });

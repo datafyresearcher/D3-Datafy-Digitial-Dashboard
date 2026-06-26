@@ -15,11 +15,14 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { error } = await getSupabaseAdmin().from("clients").insert(body);
+    const { data, error } = await getSupabaseAdmin().from("clients").insert(body).select().single();
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(
+      { ok: true, client: data },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
+    );
   } catch (err) {
     console.error("POST /api/om/clients:", err);
     return NextResponse.json({ error: "Failed to save client." }, { status: 500 });
@@ -97,7 +100,10 @@ export async function DELETE(request: Request) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(
+      { ok: true },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
+    );
   } catch (err) {
     console.error("DELETE /api/om/clients:", err);
     return NextResponse.json({ error: "Failed to delete client." }, { status: 500 });
@@ -115,11 +121,19 @@ export async function PATCH(request: Request) {
     if (!id) {
       return NextResponse.json({ error: "Client id is required." }, { status: 400 });
     }
-    const { error } = await getSupabaseAdmin().from("clients").update(row).eq("id", id);
+    const { data, error } = await getSupabaseAdmin()
+      .from("clients")
+      .update(row)
+      .eq("id", id)
+      .select()
+      .single();
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(
+      { ok: true, client: data },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
+    );
   } catch (err) {
     console.error("PATCH /api/om/clients:", err);
     return NextResponse.json({ error: "Failed to update client." }, { status: 500 });
