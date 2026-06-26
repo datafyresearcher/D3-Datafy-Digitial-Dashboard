@@ -9,6 +9,192 @@ import { getSupabaseAdmin, isSupabaseAdminConfigured } from "@/lib/supabase/serv
  *
  * Body: { name, email, password, company, clientId, clientSubRole? }
  */
+
+function isEmailTakenMessage(message: string | undefined): boolean {
+  if (!message) return false;
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("already been registered") ||
+    lower.includes("already exists") ||
+    lower.includes("duplicate")
+  );
+}
+
+async function findAuthUserByEmail(
+  supabaseAdmin: ReturnType<typeof getSupabaseAdmin>,
+  email: string
+) {
+  const normalized = email.trim().toLowerCase();
+  let page = 1;
+  const perPage = 200;
+
+  while (page <= 10) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
+    if (error) throw error;
+    const match = data.users.find((u) => u.email?.trim().toLowerCase() === normalized);
+    if (match) return match;
+    if (data.users.length < perPage) break;
+    page += 1;
+  }
+  return null;
+}
+
+async function createClientAuthUser(
+  supabaseAdmin: ReturnType<typeof getSupabaseAdmin>,
+  input: {
+    name: string;
+    email: string;
+    password: string;
+    company: string;
+    clientId: string;
+    clientSubRole?: string;
+  }
+) {
+  const email = input.email.trim().toLowerCase();
+  const clientSubRole = input.clientSubRole ?? "client_admin";
+
+  const attemptCreate = async () => {
+    const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: input.password,
+      email_confirm: true,
+      user_metadata: { name: input.name, company: input.company },
+    });
+    return { created, createErr };
+  };
+
+  let { created, createErr } = await attemptCreate();
+
+  if (createErr && isEmailTakenMessage(createErr.message)) {
+    const { data: existingProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("id, client_id")
+      .ilike("email", email)
+      .maybeSingle();
+
+    let userId = existingProfile?.id ?? (await findAuthUserByEmail(supabaseAdmin, email))?.id;
+
+    if (existingProfile?.client_id && existingProfile.client_id !== input.clientId) {
+      const { data: otherClient } = await supabaseAdmin
+        .from("clients")
+        .select("id")
+        .eq("id", existingProfile.client_id)
+        .maybeSingle();
+      if (otherClient) {
+        return {
+          error: NextResponse.json(
+            { error: "This email is already linked to another active client." },
+            { status: 400 }
+          ),
+        };
+      }
+      // Profile points at a deleted client — treat as orphaned below.
+    }
+    if (!userId) {
+      return {
+        error: NextResponse.json(
+          { error: createErr.message ?? "Failed to create user." },
+          { status: 400 }
+        ),
+      };
+    }
+
+    let resolvedUserId = userId;
+
+    if (existingProfile?.client_id === input.clientId) {
+      const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        password: input.password,
+        email_confirm: true,
+        user_metadata: { name: input.name, company: input.company },
+      });
+      if (updateErr) {
+        return { error: NextResponse.json({ error: updateErr.message }, { status: 400 }) };
+      }
+    } else {
+      // Orphaned auth row from a deleted client — remove and recreate cleanly.
+      const { error: deleteErr } = await supabaseAdmin.auth.admin.deleteUser(userId);
+      if (deleteErr) {
+        return { error: NextResponse.json({ error: deleteErr.message }, { status: 400 }) };
+      }
+      ({ created, createErr } = await attemptCreate());
+      if (createErr || !created.user) {
+        return {
+          error: NextResponse.json(
+            { error: createErr?.message ?? "Failed to create user." },
+            { status: 400 }
+          ),
+        };
+      }
+      resolvedUserId = created.user.id;
+    }
+
+    const { error: profileErr } = await supabaseAdmin.from("profiles").upsert({
+      id: resolvedUserId,
+      name: input.name,
+      email,
+      role: "client",
+      company: input.company,
+      client_id: input.clientId,
+      client_sub_role: clientSubRole,
+    });
+
+    if (profileErr) {
+      return { error: NextResponse.json({ error: profileErr.message }, { status: 500 }) };
+    }
+
+    return {
+      user: {
+        id: resolvedUserId,
+        name: input.name,
+        email,
+        password: "",
+        role: "client" as const,
+        company: input.company,
+        clientId: input.clientId,
+        clientSubRole,
+        lastLogin: null,
+      },
+    };
+  }
+
+  if (createErr || !created?.user) {
+    return {
+      error: NextResponse.json(
+        { error: createErr?.message ?? "Failed to create user." },
+        { status: 400 }
+      ),
+    };
+  }
+
+  const { error: profileErr } = await supabaseAdmin.from("profiles").upsert({
+    id: created.user.id,
+    name: input.name,
+    email,
+    role: "client",
+    company: input.company,
+    client_id: input.clientId,
+    client_sub_role: clientSubRole,
+  });
+
+  if (profileErr) {
+    return { error: NextResponse.json({ error: profileErr.message }, { status: 500 }) };
+  }
+
+  return {
+    user: {
+      id: created.user.id,
+      name: input.name,
+      email,
+      password: "",
+      role: "client" as const,
+      company: input.company,
+      clientId: input.clientId,
+      clientSubRole,
+      lastLogin: null,
+    },
+  };
+}
+
 export async function POST(request: Request) {
   try {
     if (!isSupabaseAdminConfigured()) {
@@ -29,48 +215,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: created, error: createErr } =
-      await supabaseAdmin.auth.admin.createUser({
-        email: email.trim().toLowerCase(),
-        password,
-        email_confirm: true,
-        user_metadata: { name, company },
-      });
-
-    if (createErr || !created.user) {
-      return NextResponse.json(
-        { error: createErr?.message ?? "Failed to create user." },
-        { status: 400 }
-      );
-    }
-
-    const { error: profileErr } = await supabaseAdmin.from("profiles").upsert({
-      id: created.user.id,
+    const result = await createClientAuthUser(supabaseAdmin, {
       name,
-      email: email.trim().toLowerCase(),
-      role: "client",
+      email,
+      password,
       company,
-      client_id: clientId,
-      client_sub_role: clientSubRole ?? "client_admin",
+      clientId,
+      clientSubRole,
     });
 
-    if (profileErr) {
-      return NextResponse.json({ error: profileErr.message }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      user: {
-        id: created.user.id,
-        name,
-        email: email.trim().toLowerCase(),
-        password: "",
-        role: "client",
-        company,
-        clientId,
-        clientSubRole: clientSubRole ?? "client_admin",
-        lastLogin: null,
-      },
-    });
+    if ("error" in result && result.error) return result.error;
+    return NextResponse.json({ user: result.user });
   } catch (err) {
     console.error("create-user error:", err);
     return NextResponse.json({ error: "Failed to create user." }, { status: 500 });

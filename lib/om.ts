@@ -218,6 +218,8 @@ export type Store = {
 
 let cache: Store | null = null;
 let loading: Promise<void> | null = null;
+/** Bumped on every mutate so in-flight refreshes cannot overwrite newer data. */
+let syncGeneration = 0;
 type Listener = () => void;
 const listeners = new Set<Listener>();
 
@@ -289,28 +291,36 @@ async function staffApiDelete(
   }
 }
 
-async function syncStoreFromServer(staff = false): Promise<void> {
+function invalidatePendingSyncs() {
+  syncGeneration += 1;
+}
+
+async function fetchStoreFromServer(staff = false): Promise<Store | null> {
   if (staff && isSupabaseConfigured()) {
-    const latest = await pullStoreViaStaffApi();
-    if (latest) {
-      cache = latest;
-      emit();
-    }
-    return;
+    return pullStoreViaStaffApi();
   }
   if (await hasSupabaseSession()) {
-    await refresh();
-    return;
+    return pullStoreFromSupabase(supabase);
   }
   if (isSupabaseConfigured()) {
-    const latest = await pullStoreViaStaffApi();
-    if (latest) {
-      cache = latest;
-      emit();
-    }
+    return pullStoreViaStaffApi();
+  }
+  return null;
+}
+
+async function applyServerStore(generation: number, staff = false): Promise<void> {
+  const latest = await fetchStoreFromServer(staff);
+  if (generation === syncGeneration && latest) {
+    cache = latest;
+    emit();
     return;
   }
-  if (cache) persistLocalStore(cache);
+  if (!isSupabaseConfigured() && cache) persistLocalStore(cache);
+}
+
+async function syncStoreFromServer(staff = false): Promise<void> {
+  const generation = syncGeneration;
+  await applyServerStore(generation, staff);
 }
 
 function nullableDate(value: string | undefined | null): string | null {
@@ -695,21 +705,22 @@ async function pullStoreViaStaffApi(): Promise<Store | null> {
 export async function refresh(): Promise<void> {
   // Serialize concurrent refreshes.
   if (loading) return loading;
+  const generation = syncGeneration;
   loading = (async () => {
     try {
-      const remote = await hasSupabaseSession();
-      if (!remote) {
-        if (!isSupabaseConfigured()) {
+      if (!isSupabaseConfigured()) {
+        if (generation === syncGeneration) {
           cache = loadLocalStore();
-        } else {
-          cache = (await pullStoreViaStaffApi()) ?? cache ?? emptyStore();
+          emit();
         }
-        emit();
         return;
       }
 
-      cache = await pullStoreFromSupabase(supabase);
-      emit();
+      const latest = await fetchStoreFromServer(false);
+      if (generation === syncGeneration) {
+        cache = latest ?? cache ?? emptyStore();
+        emit();
+      }
     } finally {
       loading = null;
     }
@@ -731,6 +742,7 @@ export async function resetStore(): Promise<void> {
 
 /** Mutate the cache locally then reload from server so it stays in sync. */
 async function mutate(localFn: (s: Store) => void, staffSync = false): Promise<void> {
+  invalidatePendingSyncs();
   if (!cache) cache = emptyStore();
   localFn(cache);
   publishStore(); // optimistic UI update (new snapshot reference)
@@ -805,16 +817,11 @@ export async function createClient(input: Omit<Client, "id" | "createdAt" | "act
     billing_tier: input.billingTier,
     status: input.status,
   };
-  const remote = await hasSupabaseSession();
-  if (remote) {
-    const { error } = await supabase.from("clients").insert(row);
-    if (error && isSupabaseConfigured()) {
-      await staffApiWrite("/api/om/clients", "POST", row);
-    } else if (error) {
-      throw error;
-    }
-  } else if (isSupabaseConfigured()) {
+  if (isSupabaseConfigured()) {
     await staffApiWrite("/api/om/clients", "POST", row);
+  } else {
+    const { error } = await supabase.from("clients").insert(row);
+    if (error) throw error;
   }
 
   await mutate((s) => {

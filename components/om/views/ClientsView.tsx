@@ -24,6 +24,7 @@ import {
   updateClient,
   deleteClient,
   formatOmError,
+  refresh,
 } from "@/lib/om";
 import { canManage } from "../perms";
 import {
@@ -218,13 +219,23 @@ export default function ClientsView({ user, store }: { user: User; store: Store 
             } else {
               const password = genPassword();
               const c = await createClient({ ...data }, user);
-              await addOmUser({
-                name: c.contactName,
-                email: c.email,
-                password,
-                company: c.company,
-                clientId: c.id,
-              });
+              try {
+                await addOmUser({
+                  name: c.contactName,
+                  email: c.email,
+                  password,
+                  company: c.company,
+                  clientId: c.id,
+                });
+              } catch (userErr) {
+                try {
+                  await deleteClient(c.id, user);
+                } catch (rollbackErr) {
+                  console.error("Rollback client after user creation failed:", rollbackErr);
+                }
+                throw userErr;
+              }
+              await refresh();
               setShowForm(false);
               setCreds({ email: c.email, password });
             }

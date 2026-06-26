@@ -38,7 +38,30 @@ export async function DELETE(request: Request) {
     if (!id) {
       return NextResponse.json({ error: "Client id is required." }, { status: 400 });
     }
-    const { error } = await getSupabaseAdmin().from("clients").delete().eq("id", id);
+
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // Remove portal logins tied to this client so the email can be reused.
+    const { data: profiles, error: profilesErr } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("client_id", id);
+    if (profilesErr) {
+      return NextResponse.json({ error: profilesErr.message }, { status: 400 });
+    }
+
+    for (const profile of profiles ?? []) {
+      const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(profile.id);
+      if (authErr) {
+        console.error(`DELETE /api/om/clients: could not delete auth user ${profile.id}:`, authErr);
+        return NextResponse.json(
+          { error: `Could not remove login for this client: ${authErr.message}` },
+          { status: 400 }
+        );
+      }
+    }
+
+    const { error } = await supabaseAdmin.from("clients").delete().eq("id", id);
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
