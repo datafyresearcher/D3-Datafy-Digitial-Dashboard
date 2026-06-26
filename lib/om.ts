@@ -21,7 +21,7 @@
  *   uid/nowISO
  */
 
-import { supabase } from "@/lib/supabase/browser";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase/browser";
 import type { User } from "./auth";
 import { seedStore } from "./om-seed";
 
@@ -290,14 +290,65 @@ export function formatOmError(err: unknown): string {
   if (msg.includes("row-level security") || e?.code === "42501") {
     return "You do not have permission to save projects. Sign in as an admin.";
   }
-  if (msg.includes("Payload too large") || msg.includes("timeout") || msg.includes("Failed to fetch")) {
+  if (
+    msg.includes("Payload too large") ||
+    msg.includes("timeout") ||
+    msg.includes("Failed to fetch")
+  ) {
     return "Uploaded photos are too large. Try fewer or smaller images.";
+  }
+  if (msg.includes("quota") || msg.includes("setItem")) {
+    return "Browser storage is full. Sign in again to save to the cloud, or remove uploaded photos.";
   }
   return msg || "Could not save the project. Please check the form and try again.";
 }
 
+function isDataUrl(url: string | undefined | null): boolean {
+  return !!url?.startsWith("data:");
+}
+
+/** Strip embedded images before localStorage — data URLs can exceed the ~5MB quota. */
+function stripHeavyMedia(store: Store): Store {
+  const strip = (url: string | undefined) => (isDataUrl(url) ? "" : (url ?? ""));
+
+  return {
+    ...store,
+    projects: store.projects.map((p) => ({
+      ...p,
+      gallery: p.gallery.map((g) => ({ ...g, url: strip(g.url) })),
+    })),
+    visits: store.visits.map((v) => ({
+      ...v,
+      images: v.images.map((img) => ({ ...img, url: strip(img.url) })),
+      signature: strip(v.signature),
+    })),
+    inspections: store.inspections.map((i) => ({
+      ...i,
+      orthomosaicUrl: strip(i.orthomosaicUrl),
+      rgbUrl: strip(i.rgbUrl),
+      thermalUrl: strip(i.thermalUrl),
+      reportPdfUrl: strip(i.reportPdfUrl),
+      layoutUrl: strip(i.layoutUrl),
+      processedImages: i.processedImages.map((img) => ({ ...img, url: strip(img.url) })),
+    })),
+  };
+}
+
+function clearLocalStoreSnapshot() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(STORE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 function loadLocalStore(): Store {
   if (typeof window === "undefined") return emptyStore();
+  if (isSupabaseConfigured()) {
+    clearLocalStoreSnapshot();
+    return seedStore(uid);
+  }
   try {
     const raw = window.localStorage.getItem(STORE_KEY);
     if (raw) return JSON.parse(raw) as Store;
@@ -310,9 +361,27 @@ function loadLocalStore(): Store {
 }
 
 function persistLocalStore(store: Store) {
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(STORE_KEY, JSON.stringify(store));
+  if (typeof window === "undefined" || isSupabaseConfigured()) return;
+
+  const payload = JSON.stringify(stripHeavyMedia(store));
+  try {
+    window.localStorage.setItem(STORE_KEY, payload);
+  } catch {
+    try {
+      clearLocalStoreSnapshot();
+      window.localStorage.setItem(STORE_KEY, payload);
+    } catch {
+      // In-memory cache still works for this session.
+    }
   }
+}
+
+async function requireRemoteSession(action: string): Promise<boolean> {
+  const remote = await hasSupabaseSession();
+  if (isSupabaseConfigured() && !remote) {
+    throw new Error(`Your session expired. Sign out and sign in again to ${action}.`);
+  }
+  return remote;
 }
 
 /** Subscribe to store changes; returns an unsubscribe fn. */
@@ -337,6 +406,7 @@ function emptyStore(): Store {
 /** Synchronous snapshot. Triggers a background load on first call. */
 export function getStore(): Store {
   if (!cache) {
+    if (isSupabaseConfigured()) clearLocalStoreSnapshot();
     cache = emptyStore();
     // Fire-and-forget; callers will re-render once data lands.
     void refresh();
@@ -488,7 +558,7 @@ export async function refresh(): Promise<void> {
     try {
       const remote = await hasSupabaseSession();
       if (!remote) {
-        cache = loadLocalStore();
+        cache = isSupabaseConfigured() ? seedStore(uid) : loadLocalStore();
         emit();
         return;
       }
@@ -569,8 +639,13 @@ export async function refresh(): Promise<void> {
 /** Replace the cache from the server (used by the "reset demo data" action). */
 export async function resetStore(): Promise<void> {
   const remote = await hasSupabaseSession();
-  if (remote) {
-    await refresh();
+  if (remote || isSupabaseConfigured()) {
+    if (isSupabaseConfigured()) clearLocalStoreSnapshot();
+    if (remote) await refresh();
+    else {
+      cache = seedStore(uid);
+      emit();
+    }
     return;
   }
   cache = seedStore(uid);
@@ -586,7 +661,7 @@ async function mutate(localFn: (s: Store) => void): Promise<void> {
   const remote = await hasSupabaseSession();
   if (remote) {
     await refresh(); // reconcile with server truth
-  } else {
+  } else if (!isSupabaseConfigured()) {
     persistLocalStore(cache);
   }
 }
@@ -650,7 +725,7 @@ export async function createClient(input: Omit<Client, "id" | "createdAt" | "act
     activity: [{ id: uid(), ts: nowISO(), type: "create", detail: "Client onboarded" }],
   };
 
-  if (await hasSupabaseSession()) {
+  if (await requireRemoteSession("save clients")) {
     const { error } = await supabase.from("clients").insert({
       id,
       company: input.company,
@@ -732,7 +807,7 @@ export async function createProject(
     name: input.name.trim(),
   };
 
-  if (await hasSupabaseSession()) {
+  if (await requireRemoteSession("save projects")) {
     const { error } = await supabase.from("projects").insert(projectToDbRow(project));
     if (error) throw error;
   }
@@ -751,7 +826,7 @@ export async function updateProject(id: string, patch: Partial<Project>, user: U
   const row = projectToDbRow(merged);
   delete (row as { id?: string }).id;
 
-  if (await hasSupabaseSession()) {
+  if (await requireRemoteSession("save projects")) {
     const { error } = await supabase.from("projects").update(row).eq("id", id);
     if (error) throw error;
   }

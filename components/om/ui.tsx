@@ -244,8 +244,8 @@ export function fileToDataUrl(file: File): Promise<string> {
 /** Resize/compress an image for JSON storage (keeps payloads Supabase-friendly). */
 export async function compressImageFile(
   file: File,
-  maxDim = 1600,
-  quality = 0.78
+  maxDim = 1280,
+  quality = 0.72
 ): Promise<string> {
   if (!file.type.startsWith("image/") || typeof document === "undefined") {
     return fileToDataUrl(file);
@@ -260,24 +260,31 @@ export async function compressImageFile(
       el.src = blobUrl;
     });
 
-    let { width, height } = img;
-    const scale = Math.min(1, maxDim / Math.max(width, height));
-    width = Math.max(1, Math.round(width * scale));
-    height = Math.max(1, Math.round(height * scale));
+    const render = (dim: number, q: number) => {
+      let { width, height } = img;
+      const scale = Math.min(1, dim / Math.max(width, height));
+      width = Math.max(1, Math.round(width * scale));
+      height = Math.max(1, Math.round(height * scale));
 
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return fileToDataUrl(file);
-    ctx.drawImage(img, 0, 0, width, height);
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.drawImage(img, 0, 0, width, height);
+      return canvas.toDataURL("image/jpeg", q);
+    };
 
-    const mime = file.type === "image/png" ? "image/png" : "image/jpeg";
-    let dataUrl = canvas.toDataURL(mime, quality);
-    if (dataUrl.length > 900_000 && mime === "image/jpeg") {
-      dataUrl = canvas.toDataURL("image/jpeg", 0.55);
+    for (const [dim, q] of [
+      [maxDim, quality],
+      [1024, 0.62],
+      [800, 0.5],
+    ] as const) {
+      const dataUrl = render(dim, q);
+      if (dataUrl && dataUrl.length <= 400_000) return dataUrl;
     }
-    return dataUrl;
+
+    return render(640, 0.42) ?? fileToDataUrl(file);
   } finally {
     URL.revokeObjectURL(blobUrl);
   }
