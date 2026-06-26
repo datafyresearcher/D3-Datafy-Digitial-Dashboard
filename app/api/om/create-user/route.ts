@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
+import { getSupabaseAdmin, isSupabaseAdminConfigured } from "@/lib/supabase/server";
 
 /**
  * POST /api/om/create-user
@@ -11,6 +11,14 @@ import { supabaseAdmin } from "@/lib/supabase/server";
  */
 export async function POST(request: Request) {
   try {
+    if (!isSupabaseAdminConfigured()) {
+      return NextResponse.json(
+        { error: "Supabase is not configured on this deployment." },
+        { status: 503 }
+      );
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
     const body = await request.json();
     const { name, email, password, company, clientId, clientSubRole } = body;
 

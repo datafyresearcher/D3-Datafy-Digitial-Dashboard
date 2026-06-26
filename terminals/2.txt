@@ -1,7 +1,7 @@
 ---
-pid: 25172
+pid: 25056
 cwd: "C:\Users\Datafy\OneDrive\Desktop\vibe"
 command: "npm run dev"
-started_at: 2026-06-25T20:25:35.075Z
-running_for_ms: 3829998  
+started_at: 2026-06-26T04:08:27.517Z
+running_for_ms: 3580005  
 ---
