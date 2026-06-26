@@ -103,11 +103,13 @@ export default function ClientsView({ user, store }: { user: User; store: Store 
 
   const filtered = useMemo(
     () =>
-      store.clients.filter(
-        (c) =>
-          c.company.toLowerCase().includes(query.toLowerCase()) ||
-          c.contactName.toLowerCase().includes(query.toLowerCase())
-      ),
+      [...store.clients]
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+        .filter(
+          (c) =>
+            c.company.toLowerCase().includes(query.toLowerCase()) ||
+            c.contactName.toLowerCase().includes(query.toLowerCase())
+        ),
     [store.clients, query]
   );
 

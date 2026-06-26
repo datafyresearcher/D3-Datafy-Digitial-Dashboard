@@ -38,5 +38,14 @@ const emptySnapshot = (): Store => ({
 // Hydrate only after the auth guard has mounted (useEffect below).
 let snapshot: Store = emptySnapshot();
 subscribe(() => {
-  snapshot = getStore();
+  const store = getStore();
+  snapshot = {
+    clients: [...store.clients],
+    projects: [...store.projects],
+    visits: [...store.visits],
+    inspections: [...store.inspections],
+    performance: [...store.performance],
+    docs: [...store.docs],
+    audit: [...store.audit],
+  };
 });

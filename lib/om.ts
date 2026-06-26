@@ -233,6 +233,25 @@ function emit() {
   listeners.forEach((l) => l());
 }
 
+/** Shallow snapshot so useSyncExternalStore detects in-place mutations. */
+function snapshotStore(store: Store): Store {
+  return {
+    clients: [...store.clients],
+    projects: [...store.projects],
+    visits: [...store.visits],
+    inspections: [...store.inspections],
+    performance: [...store.performance],
+    docs: [...store.docs],
+    audit: [...store.audit],
+  };
+}
+
+function publishStore() {
+  if (!cache) cache = emptyStore();
+  cache = snapshotStore(cache);
+  emit();
+}
+
 async function hasSupabaseSession(): Promise<boolean> {
   try {
     const { data } = await supabase.auth.getSession();
@@ -678,11 +697,18 @@ export async function resetStore(): Promise<void> {
 async function mutate(localFn: (s: Store) => void): Promise<void> {
   if (!cache) cache = emptyStore();
   localFn(cache);
-  emit(); // optimistic UI update
+  publishStore(); // optimistic UI update (new snapshot reference)
+
   const remote = await hasSupabaseSession();
   if (remote) {
     await refresh(); // reconcile with server truth
-  } else if (!isSupabaseConfigured()) {
+  } else if (isSupabaseConfigured()) {
+    const latest = await pullStoreViaStaffApi();
+    if (latest) {
+      cache = latest;
+      emit();
+    }
+  } else {
     persistLocalStore(cache);
   }
 }
@@ -758,7 +784,11 @@ export async function createClient(input: Omit<Client, "id" | "createdAt" | "act
   const remote = await hasSupabaseSession();
   if (remote) {
     const { error } = await supabase.from("clients").insert(row);
-    if (error) throw error;
+    if (error && isSupabaseConfigured()) {
+      await staffApiWrite("/api/om/clients", "POST", row);
+    } else if (error) {
+      throw error;
+    }
   } else if (isSupabaseConfigured()) {
     await staffApiWrite("/api/om/clients", "POST", row);
   }
