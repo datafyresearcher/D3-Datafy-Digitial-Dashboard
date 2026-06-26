@@ -300,11 +300,9 @@ async function fetchStoreFromServer(staff = false): Promise<Store | null> {
     return pullStoreViaStaffApi();
   }
   if (isSupabaseConfigured()) {
-    // For staff users (super_admin / field_engineer), always pull via the admin
-    // (staff) API. This guarantees they see 100% of data (including rows just
-    // written via service-role in create/delete flows) without relying on RLS
-    // evaluation. Regular client users must go through the browser session so
-    // that RLS scoping applies.
+    // For staff users (super_admin / field_engineer), prefer the admin (staff) API
+    // so we get a complete unfiltered view (especially important right after service-role
+    // writes for create/delete). Falls back to RLS browser pull otherwise.
     try {
       const { data } = await supabase.auth.getSession();
       const uid = data?.session?.user?.id;
@@ -320,7 +318,7 @@ async function fetchStoreFromServer(staff = false): Promise<Store | null> {
         }
       }
     } catch {
-      // fall through to session-based pull
+      // fall through
     }
 
     if (await hasSupabaseSession()) {
@@ -716,7 +714,7 @@ export async function pullStoreFromSupabase(client: SupabaseClient): Promise<Sto
 
 async function pullStoreViaStaffApi(): Promise<Store | null> {
   try {
-    const res = await fetch("/api/om/store");
+    const res = await fetch("/api/om/store", { cache: "no-store" });
     if (!res.ok) return null;
     return (await res.json()) as Store;
   } catch {

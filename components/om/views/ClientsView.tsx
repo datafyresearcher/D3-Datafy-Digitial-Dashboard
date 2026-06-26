@@ -235,7 +235,6 @@ export default function ClientsView({ user, store }: { user: User; store: Store 
                 }
                 throw userErr;
               }
-              await refresh();
               setQuery("");
               setShowForm(false);
               setCreds({ email: c.email, password });
