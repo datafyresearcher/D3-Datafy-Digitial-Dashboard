@@ -16,6 +16,9 @@ import {
   Menu,
   X,
   ShieldCheck,
+  Wind,
+  Zap,
+  Cable,
 } from "lucide-react";
 import { omLogout, type Role, type User } from "@/lib/auth";
 import { useOmStore } from "./useOmStore";
@@ -46,7 +49,13 @@ const ALL_VIEWS: { id: ViewId; label: string; icon: typeof Sun; roles: Role[] }[
   { id: "inspections", label: "Drone Inspections", icon: Radar, roles: ["super_admin", "field_engineer", "client"] },
   { id: "performance", label: "Performance", icon: LineChart, roles: ["super_admin", "field_engineer", "client"] },
   { id: "reports", label: "Reports & Docs", icon: FileText, roles: ["super_admin", "field_engineer", "client"] },
-  { id: "sites", label: "Site Locations", icon: Globe, roles: ["super_admin", "field_engineer", "client"] },
+  { id: "sites", label: "GIS", icon: Globe, roles: ["super_admin", "field_engineer", "client"] },
+];
+
+const FUTURE_VIEWS: { id: string; label: string; icon: typeof Sun; roles: Role[] }[] = [
+  { id: "wind-inspections", label: "Wind Farms Inspections", icon: Wind, roles: ["super_admin", "field_engineer", "client"] },
+  { id: "substation-inspections", label: "Substation Inspections", icon: Zap, roles: ["super_admin", "field_engineer", "client"] },
+  { id: "tl-inspections", label: "TL Inspection", icon: Cable, roles: ["super_admin", "field_engineer", "client"] },
 ];
 
 const ROLE_LABEL: Record<Role, string> = {
@@ -63,6 +72,7 @@ export default function OmPortalShell({ user }: { user: User }) {
   const [globalProjectId, setGlobalProjectId] = useState<string>("");
 
   const views = useMemo(() => ALL_VIEWS.filter((v) => v.roles.includes(user.role)), [user.role]);
+  const futureViews = useMemo(() => FUTURE_VIEWS.filter((v) => v.roles.includes(user.role)), [user.role]);
 
   const initials = useMemo(
     () =>
@@ -132,6 +142,23 @@ export default function OmPortalShell({ user }: { user: User }) {
               </button>
             );
           })}
+          {futureViews.length > 0 && (
+            <div className="pt-3 mt-3 border-t border-white/10 space-y-1">
+              {futureViews.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  disabled
+                  title="Planned feature — coming in a future release"
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-white/35 cursor-not-allowed"
+                >
+                  <v.icon className="w-4.5 h-4.5 shrink-0 opacity-50" />
+                  <span className="flex-1 text-left truncate">{v.label}</span>
+                  <span className="shrink-0 text-[10px] font-bold tracking-wider text-amber-400/70">[FUTURE]</span>
+                </button>
+              ))}
+            </div>
+          )}
         </nav>
 
         <div className="px-4 py-4 border-t border-white/10">
