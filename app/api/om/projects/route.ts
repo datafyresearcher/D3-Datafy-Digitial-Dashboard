@@ -23,6 +23,28 @@ export async function POST(request: Request) {
   }
 }
 
+export async function DELETE(request: Request) {
+  if (!isSupabaseAdminConfigured()) {
+    return NextResponse.json({ error: "Server database is not configured." }, { status: 503 });
+  }
+
+  try {
+    const body = await request.json();
+    const id = body?.id as string | undefined;
+    if (!id) {
+      return NextResponse.json({ error: "Project id is required." }, { status: 400 });
+    }
+    const { error } = await getSupabaseAdmin().from("projects").delete().eq("id", id);
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE /api/om/projects:", err);
+    return NextResponse.json({ error: "Failed to delete project." }, { status: 500 });
+  }
+}
+
 export async function PATCH(request: Request) {
   if (!isSupabaseAdminConfigured()) {
     return NextResponse.json({ error: "Server database is not configured." }, { status: 503 });

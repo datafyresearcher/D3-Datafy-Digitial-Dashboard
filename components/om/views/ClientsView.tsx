@@ -178,8 +178,13 @@ export default function ClientsView({ user, store }: { user: User; store: Store 
                   size="sm"
                   variant="danger"
                   onClick={async () => {
-                    if (confirm(`Delete ${c.company}? This removes their projects too.`))
+                    if (!confirm(`Delete ${c.company}? This removes their projects too.`)) return;
+                    try {
                       await deleteClient(c.id, user);
+                    } catch (err) {
+                      console.error("Delete client failed:", err);
+                      alert(formatOmError(err));
+                    }
                   }}
                 >
                   <Trash2 className="w-3.5 h-3.5" />

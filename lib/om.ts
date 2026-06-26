@@ -263,8 +263,8 @@ async function hasSupabaseSession(): Promise<boolean> {
 
 async function staffApiWrite(
   path: "/api/om/clients" | "/api/om/projects",
-  method: "POST" | "PATCH",
-  body: Record<string, unknown>
+  method: "POST" | "PATCH" | "DELETE",
+  body: Record<string, unknown> = {}
 ): Promise<void> {
   const res = await fetch(path, {
     method,
@@ -273,7 +273,8 @@ async function staffApiWrite(
   });
   if (!res.ok) {
     const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(payload?.error ?? `Could not save via ${path}.`);
+    const action = method === "DELETE" ? "delete via" : "save via";
+    throw new Error(payload?.error ?? `Could not ${action} ${path}.`);
   }
 }
 
@@ -830,7 +831,18 @@ export async function updateClient(id: string, patch: Partial<Client>, user: Use
 }
 
 export async function deleteClient(id: string, user: User) {
-  await supabase.from("clients").delete().eq("id", id);
+  const remote = await hasSupabaseSession();
+  if (remote) {
+    const { error } = await supabase.from("clients").delete().eq("id", id);
+    if (error && isSupabaseConfigured()) {
+      await staffApiWrite("/api/om/clients", "DELETE", { id });
+    } else if (error) {
+      throw error;
+    }
+  } else if (isSupabaseConfigured()) {
+    await staffApiWrite("/api/om/clients", "DELETE", { id });
+  }
+
   await mutate((s) => {
     s.clients = s.clients.filter((c) => c.id !== id);
     s.projects = s.projects.filter((p) => p.clientId !== id);
@@ -906,7 +918,18 @@ export async function updateProject(id: string, patch: Partial<Project>, user: U
 }
 
 export async function deleteProject(id: string, user: User) {
-  await supabase.from("projects").delete().eq("id", id);
+  const remote = await hasSupabaseSession();
+  if (remote) {
+    const { error } = await supabase.from("projects").delete().eq("id", id);
+    if (error && isSupabaseConfigured()) {
+      await staffApiWrite("/api/om/projects", "DELETE", { id });
+    } else if (error) {
+      throw error;
+    }
+  } else if (isSupabaseConfigured()) {
+    await staffApiWrite("/api/om/projects", "DELETE", { id });
+  }
+
   await mutate((s) => {
     s.projects = s.projects.filter((p) => p.id !== id);
     s.visits = s.visits.filter((v) => v.projectId !== id);
