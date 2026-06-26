@@ -28,6 +28,7 @@ import {
   createProject,
   updateProject,
   deleteProject,
+  formatOmError,
   maintenanceStatus,
   healthScore,
   uid,
@@ -44,7 +45,7 @@ import {
   Textarea,
   Modal,
   EmptyState,
-  fileToDataUrl,
+  compressImageFile,
 } from "../ui";
 
 const CLASSES: ProjectClassification[] = ["Residential", "Commercial", "Industrial"];
@@ -370,7 +371,7 @@ function ProjectForm({
     if (!files) return;
     const imgs: GalleryImage[] = [];
     for (const f of Array.from(files)) {
-      const url = await fileToDataUrl(f);
+      const url = await compressImageFile(f);
       imgs.push({ id: uid("img"), url, caption: f.name, uploadedAt: new Date().toISOString() });
     }
     setForm({ ...form, gallery: [...form.gallery, ...imgs] });
@@ -406,7 +407,7 @@ function ProjectForm({
       onClose();
     } catch (err) {
       console.error("Project save failed:", err);
-      setFormError("Could not save the project. Please check the form and try again.");
+      setFormError(formatOmError(err));
     } finally {
       setSubmitting(false);
     }
@@ -476,10 +477,10 @@ function ProjectForm({
             </Field>
           )}
           <Field label="Installation date">
-            <Input type="date" value={form.installedAt} onChange={(e) => setForm({ ...form, installedAt: e.target.value })} />
+            <Input type="date" required value={form.installedAt} onChange={(e) => setForm({ ...form, installedAt: e.target.value })} />
           </Field>
           <Field label="Warranty expiry">
-            <Input type="date" value={form.warrantyExpiry} onChange={(e) => setForm({ ...form, warrantyExpiry: e.target.value })} />
+            <Input type="date" required value={form.warrantyExpiry} onChange={(e) => setForm({ ...form, warrantyExpiry: e.target.value })} />
           </Field>
           <Field label="Site contact name">
             <Input value={form.siteContactName} onChange={(e) => setForm({ ...form, siteContactName: e.target.value })} />

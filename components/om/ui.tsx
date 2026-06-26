@@ -240,3 +240,45 @@ export function fileToDataUrl(file: File): Promise<string> {
     reader.readAsDataURL(file);
   });
 }
+
+/** Resize/compress an image for JSON storage (keeps payloads Supabase-friendly). */
+export async function compressImageFile(
+  file: File,
+  maxDim = 1600,
+  quality = 0.78
+): Promise<string> {
+  if (!file.type.startsWith("image/") || typeof document === "undefined") {
+    return fileToDataUrl(file);
+  }
+
+  const blobUrl = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = reject;
+      el.src = blobUrl;
+    });
+
+    let { width, height } = img;
+    const scale = Math.min(1, maxDim / Math.max(width, height));
+    width = Math.max(1, Math.round(width * scale));
+    height = Math.max(1, Math.round(height * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return fileToDataUrl(file);
+    ctx.drawImage(img, 0, 0, width, height);
+
+    const mime = file.type === "image/png" ? "image/png" : "image/jpeg";
+    let dataUrl = canvas.toDataURL(mime, quality);
+    if (dataUrl.length > 900_000 && mime === "image/jpeg") {
+      dataUrl = canvas.toDataURL("image/jpeg", 0.55);
+    }
+    return dataUrl;
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
+}

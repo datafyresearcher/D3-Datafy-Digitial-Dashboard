@@ -241,6 +241,61 @@ async function hasSupabaseSession(): Promise<boolean> {
   }
 }
 
+function nullableDate(value: string | undefined | null): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function projectToDbRow(project: Project) {
+  return {
+    id: project.id,
+    client_id: project.clientId,
+    name: project.name.trim(),
+    address: project.address?.trim() || "—",
+    lat: Number.isFinite(project.lat) ? project.lat : 0,
+    lng: Number.isFinite(project.lng) ? project.lng : 0,
+    size_kwp: Number.isFinite(project.sizeKWp) ? project.sizeKWp : 0,
+    panel_count: Number.isFinite(project.panelCount) ? project.panelCount : 0,
+    inverter_brand: project.inverterBrand?.trim() || null,
+    inverter_model: project.inverterModel?.trim() || null,
+    has_battery: project.hasBattery,
+    battery_system: project.batterySystem?.trim() ? project.batterySystem : null,
+    grid_type: project.gridType,
+    installed_at: nullableDate(project.installedAt),
+    warranty_expiry: nullableDate(project.warrantyExpiry),
+    site_contact_name: project.siteContactName?.trim() || null,
+    site_contact_phone: project.siteContactPhone?.trim() || null,
+    classification: project.classification,
+    status: project.status,
+    string_zones: project.stringZones ?? [],
+    gallery: project.gallery ?? [],
+    client_notes: project.clientNotes ?? "",
+    maintenance_schedule: project.maintenanceSchedule?.length ? project.maintenanceSchedule : [],
+  };
+}
+
+/** Turn Supabase / validation errors into user-facing form messages. */
+export function formatOmError(err: unknown): string {
+  if (err instanceof Error && err.message && !err.message.startsWith("{")) {
+    return err.message;
+  }
+  const e = err as { message?: string; code?: string; details?: string };
+  const msg = e?.message ?? "";
+  if (e?.code === "23503") {
+    return "The selected client no longer exists. Refresh the page and pick a client again.";
+  }
+  if (e?.code === "22007" || msg.includes("invalid input syntax for type date")) {
+    return "Installation or warranty date is invalid. Please set both dates.";
+  }
+  if (msg.includes("row-level security") || e?.code === "42501") {
+    return "You do not have permission to save projects. Sign in as an admin.";
+  }
+  if (msg.includes("Payload too large") || msg.includes("timeout") || msg.includes("Failed to fetch")) {
+    return "Uploaded photos are too large. Try fewer or smaller images.";
+  }
+  return msg || "Could not save the project. Please check the form and try again.";
+}
+
 function loadLocalStore(): Store {
   if (typeof window === "undefined") return emptyStore();
   try {
@@ -657,6 +712,14 @@ export async function createProject(
   if (!input.clientId?.trim()) {
     throw new Error("A client must be selected before creating a project.");
   }
+  if (!input.name?.trim()) {
+    throw new Error("Project name is required.");
+  }
+
+  const store = getStore();
+  if (!store.clients.some((c) => c.id === input.clientId)) {
+    throw new Error("The selected client was not found. Refresh the page and try again.");
+  }
 
   const id = uid("p");
   const project: Project = {
@@ -666,34 +729,11 @@ export async function createProject(
     maintenanceSchedule: ["Quarterly"],
     ...input,
     id,
+    name: input.name.trim(),
   };
 
   if (await hasSupabaseSession()) {
-    const { error } = await supabase.from("projects").insert({
-      id,
-      client_id: project.clientId,
-      name: project.name,
-      address: project.address || "—",
-      lat: project.lat,
-      lng: project.lng,
-      size_kwp: project.sizeKWp,
-      panel_count: project.panelCount,
-      inverter_brand: project.inverterBrand,
-      inverter_model: project.inverterModel,
-      has_battery: project.hasBattery,
-      battery_system: project.batterySystem?.trim() ? project.batterySystem : null,
-      grid_type: project.gridType,
-      installed_at: project.installedAt,
-      warranty_expiry: project.warrantyExpiry,
-      site_contact_name: project.siteContactName,
-      site_contact_phone: project.siteContactPhone,
-      classification: project.classification,
-      status: project.status,
-      string_zones: project.stringZones,
-      gallery: project.gallery,
-      client_notes: project.clientNotes,
-      maintenance_schedule: project.maintenanceSchedule,
-    });
+    const { error } = await supabase.from("projects").insert(projectToDbRow(project));
     if (error) throw error;
   }
   await mutate((s) => {
@@ -704,21 +744,17 @@ export async function createProject(
 }
 
 export async function updateProject(id: string, patch: Partial<Project>, user: User) {
-  const row: Record<string, unknown> = {};
-  const map: Record<keyof Project, string> = {
-    clientId: "client_id", name: "name", address: "address", lat: "lat", lng: "lng",
-    sizeKWp: "size_kwp", panelCount: "panel_count", inverterBrand: "inverter_brand",
-    inverterModel: "inverter_model", hasBattery: "has_battery", batterySystem: "battery_system",
-    gridType: "grid_type", installedAt: "installed_at", warrantyExpiry: "warranty_expiry",
-    siteContactName: "site_contact_name", siteContactPhone: "site_contact_phone",
-    classification: "classification", status: "status", stringZones: "string_zones",
-    gallery: "gallery", clientNotes: "client_notes", maintenanceSchedule: "maintenance_schedule",
-    id: "id",
-  };
-  for (const [k, v] of Object.entries(patch)) {
-    if (map[k as keyof Project]) row[map[k as keyof Project]] = v as any;
+  const existing = getStore().projects.find((p) => p.id === id);
+  if (!existing) throw new Error("Project not found.");
+
+  const merged: Project = { ...existing, ...patch, id };
+  const row = projectToDbRow(merged);
+  delete (row as { id?: string }).id;
+
+  if (await hasSupabaseSession()) {
+    const { error } = await supabase.from("projects").update(row).eq("id", id);
+    if (error) throw error;
   }
-  await supabase.from("projects").update(row).eq("id", id);
   await mutate((s) => {
     const p = s.projects.find((x) => x.id === id);
     if (p) Object.assign(p, patch);
