@@ -63,10 +63,17 @@ const STATUS_TONE: Record<ProjectStatus, "green" | "amber" | "neutral"> = {
   Decommissioned: "neutral",
 };
 
-export default function ProjectsView({ user, store }: { user: User; store: Store }) {
+export default function ProjectsView({
+  user,
+  store,
+  onOpenProject,
+}: {
+  user: User;
+  store: Store;
+  onOpenProject?: (projectId: string) => void;
+}) {
   const projects = useMemo(() => visibleProjects(user), [user, store]);
   const [query, setQuery] = useState("");
-  const [detail, setDetail] = useState<Project | null>(null);
   const [editing, setEditing] = useState<Project | null>(null);
   const [showForm, setShowForm] = useState(false);
 
@@ -102,7 +109,7 @@ export default function ProjectsView({ user, store }: { user: User; store: Store
           const client = store.clients.find((c) => c.id === p.clientId);
           return (
             <Card key={p.id} className="p-5 hover:border-white/20 transition-colors cursor-pointer" >
-              <div onClick={() => setDetail(p)}>
+              <div onClick={() => onOpenProject?.(p.id)}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="grid place-items-center w-11 h-11 rounded-xl bg-brand-500/15 text-brand-400">
                     <FolderKanban className="w-5 h-5" />
@@ -159,9 +166,6 @@ export default function ProjectsView({ user, store }: { user: User; store: Store
         <Card><EmptyState icon={FolderKanban} title="No projects" hint={canManage(user) ? "Create your first project." : "No projects assigned."} /></Card>
       )}
 
-      {/* Detail modal */}
-      {detail && <ProjectDetail open={!!detail} onClose={() => setDetail(null)} project={detail} store={store} user={user} onEdit={() => { setEditing(detail); setDetail(null); setShowForm(true); }} />}
-
       {/* Form */}
       {showForm && (
         <ProjectForm
@@ -176,38 +180,46 @@ export default function ProjectsView({ user, store }: { user: User; store: Store
   );
 }
 
-function ProjectDetail({
-  open,
-  onClose,
+export function ProjectOverview({
   project,
   store,
   user,
-  onEdit,
 }: {
-  open: boolean;
-  onClose: () => void;
   project: Project;
   store: Store;
   user: User;
-  onEdit: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
   const client = store.clients.find((c) => c.id === project.clientId);
   const ms = maintenanceStatus(project);
   const score = healthScore(project);
 
   return (
-    <Modal open={open} onClose={onClose} title={project.name} wide>
+    <div className="space-y-6">
+      <div>
+        <h2 className="font-display font-bold text-2xl mb-1">{project.name}</h2>
+        <p className="text-sm text-white/60 flex items-center gap-1">
+          <MapPin className="w-3.5 h-3.5" /> {project.address}
+        </p>
+      </div>
+
       <div className="space-y-5">
-        {/* header badges */}
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={CLASS_TONE[project.classification]}>{project.classification}</Badge>
           <Badge tone={STATUS_TONE[project.status]}>{project.status}</Badge>
           <Badge tone="neutral">{project.gridType}</Badge>
-          {project.hasBattery && <Badge tone="green"><BatteryCharging className="w-3 h-3" /> {project.batterySystem}</Badge>}
-          {canManage(user) && <Button size="sm" variant="subtle" className="ml-auto" onClick={onEdit}><Pencil className="w-3.5 h-3.5" /> Edit</Button>}
+          {project.hasBattery && (
+            <Badge tone="green">
+              <BatteryCharging className="w-3 h-3" /> {project.batterySystem}
+            </Badge>
+          )}
+          {canManage(user) && (
+            <Button size="sm" variant="subtle" className="ml-auto" onClick={() => setEditing(true)}>
+              <Pencil className="w-3.5 h-3.5" /> Edit
+            </Button>
+          )}
         </div>
 
-        {/* spec grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
           {[
             ["Client", client?.company ?? "—"],
@@ -236,7 +248,6 @@ function ProjectDetail({
           </div>
         )}
 
-        {/* String / zone mapping */}
         <Section icon={Network} title="String & Zone Mapping">
           {project.stringZones.length === 0 ? (
             <p className="text-sm text-white/40 py-3">No strings/zones mapped.</p>
@@ -253,7 +264,6 @@ function ProjectDetail({
           )}
         </Section>
 
-        {/* Site gallery */}
         <Section icon={Images} title="Site Photo Gallery">
           {project.gallery.length === 0 ? (
             <p className="text-sm text-white/40 py-3">No site photos yet. Upload from the project editor.</p>
@@ -268,12 +278,21 @@ function ProjectDetail({
           )}
         </Section>
 
-        {/* Client notes */}
         <Section icon={StickyNote} title="Client Notes (visible to client)">
           <p className="text-sm text-white/80 whitespace-pre-wrap">{project.clientNotes || "No notes."}</p>
         </Section>
       </div>
-    </Modal>
+
+      {editing && (
+        <ProjectForm
+          open={editing}
+          onClose={() => setEditing(false)}
+          project={project}
+          store={store}
+          user={user}
+        />
+      )}
+    </div>
   );
 }
 

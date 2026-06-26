@@ -27,7 +27,16 @@ import {
 import { canManage } from "../perms";
 import { Stat, Card, CardHeader, Badge, Button } from "../ui";
 
-type ViewId = "dashboard" | "clients" | "projects" | "maintenance" | "inspections" | "performance" | "reports";
+type ViewId =
+  | "dashboard"
+  | "clients"
+  | "projects"
+  | "sites"
+  | "overview"
+  | "maintenance"
+  | "inspections"
+  | "performance"
+  | "reports";
 
 export default function Dashboard({
   user,
@@ -40,7 +49,7 @@ export default function Dashboard({
   store: Store;
   projectId: string;
   onProject: (id: string) => void;
-  onNavigate: (v: ViewId) => void;
+  onNavigate: (v: ViewId, projectId?: string) => void;
 }) {
   const projects = useMemo(() => visibleProjects(user), [user, store]);
   const active = useMemo(
@@ -127,7 +136,11 @@ export default function Dashboard({
                 {overdueProjects.map((p) => p.name).join(", ")}
               </p>
             </div>
-            <Button size="sm" variant="subtle" onClick={() => onNavigate("maintenance")}>
+            <Button
+              size="sm"
+              variant="subtle"
+              onClick={() => onNavigate("maintenance", overdueProjects[0]?.id)}
+            >
               Review <ArrowRight className="w-3.5 h-3.5" />
             </Button>
           </div>
@@ -151,7 +164,8 @@ export default function Dashboard({
             const bar =
               score >= 80 ? "bg-emerald-500" : score >= 60 ? "bg-amber-500" : "bg-red-500";
             return (
-              <Card key={p.id} className="p-4 hover:border-white/20 transition-colors">
+              <Card key={p.id} className="p-4 hover:border-white/20 transition-colors cursor-pointer">
+                <div onClick={() => onNavigate("overview", p.id)}>
                 <div className="flex items-start justify-between mb-2">
                   <div className="min-w-0">
                     <p className="font-semibold text-sm truncate">{p.name}</p>
@@ -173,6 +187,7 @@ export default function Dashboard({
                 <div className="flex items-center justify-between text-xs text-white/50">
                   <span>Last visit: {ms.lastDate ?? "—"}</span>
                   <span>{ms.daysSince > 9000 ? "never" : `${ms.daysSince}d ago`}</span>
+                </div>
                 </div>
               </Card>
             );
