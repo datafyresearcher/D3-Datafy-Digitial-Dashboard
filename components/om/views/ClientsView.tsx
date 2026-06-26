@@ -23,6 +23,7 @@ import {
   createClient,
   updateClient,
   deleteClient,
+  formatOmError,
 } from "@/lib/om";
 import { canManage } from "../perms";
 import {
@@ -222,7 +223,7 @@ export default function ClientsView({ user, store }: { user: User; store: Store 
             }
           } catch (err) {
             console.error("Onboard client failed:", err);
-            setFormError("Could not create the client. Please try again.");
+            setFormError(formatOmError(err));
           } finally {
             setSubmitting(false);
           }

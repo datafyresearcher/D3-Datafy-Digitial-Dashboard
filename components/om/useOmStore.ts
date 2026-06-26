@@ -13,7 +13,8 @@ import { getStore, subscribe, refresh, type Store } from "@/lib/om";
  */
 export function useOmStore(): Store {
   useEffect(() => {
-    // Hydrate from Supabase when the portal mounts.
+    // Auth guard has confirmed the user; safe to load Supabase-backed data.
+    void getStore();
     void refresh();
   }, []);
 
@@ -24,10 +25,18 @@ export function useOmStore(): Store {
   );
 }
 
-// keep a module-level snapshot reference that changes identity on each emit
-let snapshot: Store = getStore();
-if (typeof window !== "undefined") {
-  subscribe(() => {
-    snapshot = getStore();
-  });
-}
+const emptySnapshot = (): Store => ({
+  clients: [],
+  projects: [],
+  visits: [],
+  inspections: [],
+  performance: [],
+  docs: [],
+  audit: [],
+});
+
+// Hydrate only after the auth guard has mounted (useEffect below).
+let snapshot: Store = emptySnapshot();
+subscribe(() => {
+  snapshot = getStore();
+});

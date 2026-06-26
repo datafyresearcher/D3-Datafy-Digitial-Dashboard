@@ -300,7 +300,10 @@ export function formatOmError(err: unknown): string {
   if (msg.includes("quota") || msg.includes("setItem")) {
     return "Browser storage is full. Sign in again to save to the cloud, or remove uploaded photos.";
   }
-  return msg || "Could not save the project. Please check the form and try again.";
+  if (msg.includes("session expired")) {
+    return msg;
+  }
+  return msg || "Could not save. Please check the form and try again.";
 }
 
 function isDataUrl(url: string | undefined | null): boolean {
@@ -345,10 +348,6 @@ function clearLocalStoreSnapshot() {
 
 function loadLocalStore(): Store {
   if (typeof window === "undefined") return emptyStore();
-  if (isSupabaseConfigured()) {
-    clearLocalStoreSnapshot();
-    return seedStore(uid);
-  }
   try {
     const raw = window.localStorage.getItem(STORE_KEY);
     if (raw) return JSON.parse(raw) as Store;
@@ -376,14 +375,6 @@ function persistLocalStore(store: Store) {
   }
 }
 
-async function requireRemoteSession(action: string): Promise<boolean> {
-  const remote = await hasSupabaseSession();
-  if (isSupabaseConfigured() && !remote) {
-    throw new Error(`Your session expired. Sign out and sign in again to ${action}.`);
-  }
-  return remote;
-}
-
 /** Subscribe to store changes; returns an unsubscribe fn. */
 export function subscribe(l: Listener): () => void {
   listeners.add(l);
@@ -406,7 +397,6 @@ function emptyStore(): Store {
 /** Synchronous snapshot. Triggers a background load on first call. */
 export function getStore(): Store {
   if (!cache) {
-    if (isSupabaseConfigured()) clearLocalStoreSnapshot();
     cache = emptyStore();
     // Fire-and-forget; callers will re-render once data lands.
     void refresh();
@@ -558,7 +548,11 @@ export async function refresh(): Promise<void> {
     try {
       const remote = await hasSupabaseSession();
       if (!remote) {
-        cache = isSupabaseConfigured() ? seedStore(uid) : loadLocalStore();
+        if (!isSupabaseConfigured()) {
+          cache = loadLocalStore();
+        } else if (!cache) {
+          cache = emptyStore();
+        }
         emit();
         return;
       }
@@ -639,17 +633,12 @@ export async function refresh(): Promise<void> {
 /** Replace the cache from the server (used by the "reset demo data" action). */
 export async function resetStore(): Promise<void> {
   const remote = await hasSupabaseSession();
-  if (remote || isSupabaseConfigured()) {
-    if (isSupabaseConfigured()) clearLocalStoreSnapshot();
-    if (remote) await refresh();
-    else {
-      cache = seedStore(uid);
-      emit();
-    }
+  if (remote) {
+    await refresh();
     return;
   }
   cache = seedStore(uid);
-  persistLocalStore(cache);
+  if (!isSupabaseConfigured()) persistLocalStore(cache);
   emit();
 }
 
@@ -725,7 +714,11 @@ export async function createClient(input: Omit<Client, "id" | "createdAt" | "act
     activity: [{ id: uid(), ts: nowISO(), type: "create", detail: "Client onboarded" }],
   };
 
-  if (await requireRemoteSession("save clients")) {
+  const remote = await hasSupabaseSession();
+  if (isSupabaseConfigured() && !remote) {
+    throw new Error("Your session expired. Sign out and sign in again to save clients.");
+  }
+  if (remote) {
     const { error } = await supabase.from("clients").insert({
       id,
       company: input.company,
@@ -807,7 +800,11 @@ export async function createProject(
     name: input.name.trim(),
   };
 
-  if (await requireRemoteSession("save projects")) {
+  const remote = await hasSupabaseSession();
+  if (isSupabaseConfigured() && !remote) {
+    throw new Error("Your session expired. Sign out and sign in again to save projects.");
+  }
+  if (remote) {
     const { error } = await supabase.from("projects").insert(projectToDbRow(project));
     if (error) throw error;
   }
@@ -826,7 +823,11 @@ export async function updateProject(id: string, patch: Partial<Project>, user: U
   const row = projectToDbRow(merged);
   delete (row as { id?: string }).id;
 
-  if (await requireRemoteSession("save projects")) {
+  const remote = await hasSupabaseSession();
+  if (isSupabaseConfigured() && !remote) {
+    throw new Error("Your session expired. Sign out and sign in again to save projects.");
+  }
+  if (remote) {
     const { error } = await supabase.from("projects").update(row).eq("id", id);
     if (error) throw error;
   }

@@ -9,7 +9,7 @@
  * is unavailable or users have not been seeded yet.
  */
 
-import { supabase } from "@/lib/supabase/browser";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase/browser";
 
 const SESSION_KEY = "d3_session";
 const PORTAL_SESSION_KEY = "om_session";
@@ -303,21 +303,30 @@ export async function getSession(): Promise<User | null> {
 /* ------------------------------------------------------------------ */
 
 export async function omLogin(loginId: string, password: string): Promise<User | null> {
+  if (!isSupabaseConfigured()) {
+    return demoOmLogin(loginId, password);
+  }
+
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
       email: loginId.trim().toLowerCase(),
       password,
     });
-    if (!error && data.user) {
+    if (error || !data.user) return null;
+
+    await stampLogin(data.user.id);
+    const profile = await fetchProfile(data.user.id);
+    if (!profile) {
+      await supabase.auth.signOut();
       clearSession(PORTAL_SESSION_KEY);
-      await stampLogin(data.user.id);
-      const profile = await fetchProfile(data.user.id);
-      if (profile) return profile;
+      return null;
     }
+
+    writeSession(PORTAL_SESSION_KEY, profile);
+    return profile;
   } catch {
-    // Supabase unavailable — fall through to demo auth.
+    return null;
   }
-  return demoOmLogin(loginId, password);
 }
 
 export async function omLogout(): Promise<void> {
@@ -330,17 +339,31 @@ export async function omLogout(): Promise<void> {
 }
 
 export async function getOmSession(): Promise<User | null> {
-  try {
-    const { data } = await supabase.auth.getSession();
-    const uid = data.session?.user.id;
-    if (uid) {
-      const profile = await fetchProfile(uid);
-      if (profile) return profile;
-    }
-  } catch {
-    // Supabase unavailable — fall through to demo session.
+  if (!isSupabaseConfigured()) {
+    return readSession(PORTAL_SESSION_KEY);
   }
-  return readSession(PORTAL_SESSION_KEY);
+
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    const uid = data.session?.user.id;
+    if (error || !uid) {
+      clearSession(PORTAL_SESSION_KEY);
+      return null;
+    }
+
+    const profile = await fetchProfile(uid);
+    if (!profile) {
+      clearSession(PORTAL_SESSION_KEY);
+      await supabase.auth.signOut();
+      return null;
+    }
+
+    writeSession(PORTAL_SESSION_KEY, profile);
+    return profile;
+  } catch {
+    clearSession(PORTAL_SESSION_KEY);
+    return null;
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -358,6 +381,7 @@ export async function addOmUser(input: {
   clientId: string;
   clientSubRole?: ClientSubRole;
 }): Promise<User | null> {
+  let apiError = "Could not create the client login account.";
   try {
     const res = await fetch("/api/om/create-user", {
       method: "POST",
@@ -368,8 +392,14 @@ export async function addOmUser(input: {
       const { user } = await res.json();
       return user as User;
     }
-  } catch {
-    // API unavailable — fall through to local demo user store.
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    apiError = body?.error ?? apiError;
+    if (isSupabaseConfigured()) {
+      throw new Error(apiError);
+    }
+  } catch (err) {
+    if (isSupabaseConfigured()) throw err;
+    // API unavailable in local demo mode — fall through to local demo user store.
   }
 
   const user: User = {
