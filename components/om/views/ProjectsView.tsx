@@ -151,7 +151,15 @@ export default function ProjectsView({
                     <Button
                       size="sm"
                       variant="danger"
-                      onClick={() => { if (confirm(`Delete ${p.name}?`)) deleteProject(p.id, user); }}
+                      onClick={async () => {
+                        if (!confirm(`Delete ${p.name}?`)) return;
+                        try {
+                          await deleteProject(p.id, user);
+                        } catch (err) {
+                          console.error("Delete project failed:", err);
+                          alert(formatOmError(err));
+                        }
+                      }}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>

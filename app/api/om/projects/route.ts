@@ -29,8 +29,12 @@ export async function DELETE(request: Request) {
   }
 
   try {
-    const body = await request.json();
-    const id = body?.id as string | undefined;
+    const url = new URL(request.url);
+    let id = url.searchParams.get("id") ?? undefined;
+    if (!id) {
+      const body = (await request.json().catch(() => null)) as { id?: string } | null;
+      id = body?.id;
+    }
     if (!id) {
       return NextResponse.json({ error: "Project id is required." }, { status: 400 });
     }

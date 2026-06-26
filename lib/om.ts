@@ -263,8 +263,8 @@ async function hasSupabaseSession(): Promise<boolean> {
 
 async function staffApiWrite(
   path: "/api/om/clients" | "/api/om/projects",
-  method: "POST" | "PATCH" | "DELETE",
-  body: Record<string, unknown> = {}
+  method: "POST" | "PATCH",
+  body: Record<string, unknown>
 ): Promise<void> {
   const res = await fetch(path, {
     method,
@@ -273,9 +273,44 @@ async function staffApiWrite(
   });
   if (!res.ok) {
     const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-    const action = method === "DELETE" ? "delete via" : "save via";
-    throw new Error(payload?.error ?? `Could not ${action} ${path}.`);
+    throw new Error(payload?.error ?? `Could not save via ${path}.`);
   }
+}
+
+/** DELETE with id in query string — reliable on Vercel (request bodies on DELETE often drop). */
+async function staffApiDelete(
+  path: "/api/om/clients" | "/api/om/projects",
+  id: string
+): Promise<void> {
+  const res = await fetch(`${path}?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) {
+    const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(payload?.error ?? `Could not delete via ${path}.`);
+  }
+}
+
+async function syncStoreFromServer(staff = false): Promise<void> {
+  if (staff && isSupabaseConfigured()) {
+    const latest = await pullStoreViaStaffApi();
+    if (latest) {
+      cache = latest;
+      emit();
+    }
+    return;
+  }
+  if (await hasSupabaseSession()) {
+    await refresh();
+    return;
+  }
+  if (isSupabaseConfigured()) {
+    const latest = await pullStoreViaStaffApi();
+    if (latest) {
+      cache = latest;
+      emit();
+    }
+    return;
+  }
+  if (cache) persistLocalStore(cache);
 }
 
 function nullableDate(value: string | undefined | null): string | null {
@@ -695,23 +730,11 @@ export async function resetStore(): Promise<void> {
 }
 
 /** Mutate the cache locally then reload from server so it stays in sync. */
-async function mutate(localFn: (s: Store) => void): Promise<void> {
+async function mutate(localFn: (s: Store) => void, staffSync = false): Promise<void> {
   if (!cache) cache = emptyStore();
   localFn(cache);
   publishStore(); // optimistic UI update (new snapshot reference)
-
-  const remote = await hasSupabaseSession();
-  if (remote) {
-    await refresh(); // reconcile with server truth
-  } else if (isSupabaseConfigured()) {
-    const latest = await pullStoreViaStaffApi();
-    if (latest) {
-      cache = latest;
-      emit();
-    }
-  } else {
-    persistLocalStore(cache);
-  }
+  await syncStoreFromServer(staffSync);
 }
 
 /* ===================== Audit + activity helpers ==================== */
@@ -804,7 +827,7 @@ export async function createClient(input: Omit<Client, "id" | "createdAt" | "act
       action: "create",
       target: `Client ${input.company}`,
     });
-  });
+  }, true);
   return client;
 }
 
@@ -827,27 +850,22 @@ export async function updateClient(id: string, patch: Partial<Client>, user: Use
     const c = s.clients.find((x) => x.id === id);
     if (c) Object.assign(c, patch);
     s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "edit", target: `Client ${id}` });
-  });
+  }, true);
 }
 
 export async function deleteClient(id: string, user: User) {
-  const remote = await hasSupabaseSession();
-  if (remote) {
+  if (isSupabaseConfigured()) {
+    await staffApiDelete("/api/om/clients", id);
+  } else {
     const { error } = await supabase.from("clients").delete().eq("id", id);
-    if (error && isSupabaseConfigured()) {
-      await staffApiWrite("/api/om/clients", "DELETE", { id });
-    } else if (error) {
-      throw error;
-    }
-  } else if (isSupabaseConfigured()) {
-    await staffApiWrite("/api/om/clients", "DELETE", { id });
+    if (error) throw error;
   }
 
   await mutate((s) => {
     s.clients = s.clients.filter((c) => c.id !== id);
     s.projects = s.projects.filter((p) => p.clientId !== id);
     s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "delete", target: `Client ${id}` });
-  });
+  }, true);
 }
 
 /* =================== Module 2: Projects CRUD ======================= */
@@ -891,7 +909,7 @@ export async function createProject(
   await mutate((s) => {
     s.projects.push(project);
     s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "create", target: `Project ${project.name}` });
-  });
+  }, true);
   return project;
 }
 
@@ -914,20 +932,15 @@ export async function updateProject(id: string, patch: Partial<Project>, user: U
     const p = s.projects.find((x) => x.id === id);
     if (p) Object.assign(p, patch);
     s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "edit", target: `Project ${id}` });
-  });
+  }, true);
 }
 
 export async function deleteProject(id: string, user: User) {
-  const remote = await hasSupabaseSession();
-  if (remote) {
+  if (isSupabaseConfigured()) {
+    await staffApiDelete("/api/om/projects", id);
+  } else {
     const { error } = await supabase.from("projects").delete().eq("id", id);
-    if (error && isSupabaseConfigured()) {
-      await staffApiWrite("/api/om/projects", "DELETE", { id });
-    } else if (error) {
-      throw error;
-    }
-  } else if (isSupabaseConfigured()) {
-    await staffApiWrite("/api/om/projects", "DELETE", { id });
+    if (error) throw error;
   }
 
   await mutate((s) => {
@@ -937,7 +950,7 @@ export async function deleteProject(id: string, user: User) {
     s.performance = s.performance.filter((r) => r.projectId !== id);
     s.docs = s.docs.filter((d) => d.projectId !== id);
     s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "delete", target: `Project ${id}` });
-  });
+  }, true);
 }
 
 /* =================== Module 3: Visits + defects ==================== */
