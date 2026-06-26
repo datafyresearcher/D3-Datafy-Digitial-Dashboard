@@ -819,10 +819,8 @@ export async function createClient(input: Omit<Client, "id" | "createdAt" | "act
   };
   if (isSupabaseConfigured()) {
     await staffApiWrite("/api/om/clients", "POST", row);
-  } else {
-    const { error } = await supabase.from("clients").insert(row);
-    if (error) throw error;
   }
+  // In local (!configured) mode the mutate below + persistLocalStore handles persistence.
 
   await mutate((s) => {
     s.clients.push(client);
@@ -863,10 +861,8 @@ export async function updateClient(id: string, patch: Partial<Client>, user: Use
 export async function deleteClient(id: string, user: User) {
   if (isSupabaseConfigured()) {
     await staffApiDelete("/api/om/clients", id);
-  } else {
-    const { error } = await supabase.from("clients").delete().eq("id", id);
-    if (error) throw error;
   }
+  // In local (!configured) mode the mutate below + persistLocalStore handles it.
 
   await mutate((s) => {
     s.clients = s.clients.filter((c) => c.id !== id);
@@ -945,10 +941,8 @@ export async function updateProject(id: string, patch: Partial<Project>, user: U
 export async function deleteProject(id: string, user: User) {
   if (isSupabaseConfigured()) {
     await staffApiDelete("/api/om/projects", id);
-  } else {
-    const { error } = await supabase.from("projects").delete().eq("id", id);
-    if (error) throw error;
   }
+  // In local (!configured) mode the mutate below + persistLocalStore handles it.
 
   await mutate((s) => {
     s.projects = s.projects.filter((p) => p.id !== id);

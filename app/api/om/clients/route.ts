@@ -53,12 +53,39 @@ export async function DELETE(request: Request) {
     for (const profile of profiles ?? []) {
       const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(profile.id);
       if (authErr) {
+        const msg = (authErr.message || "").toLowerCase();
+        if (msg.includes("not found") || msg.includes("no user")) {
+          // Profile points at a missing auth user (e.g. prior partial delete/rollback). Safe to ignore.
+          console.warn(`DELETE /api/om/clients: auth user ${profile.id} already removed, continuing.`);
+          continue;
+        }
         console.error(`DELETE /api/om/clients: could not delete auth user ${profile.id}:`, authErr);
         return NextResponse.json(
           { error: `Could not remove login for this client: ${authErr.message}` },
           { status: 400 }
         );
       }
+    }
+
+    // Explicitly delete projects first so client delete succeeds even if the FK
+    // constraint on projects.client_id lacks ON DELETE CASCADE (or for older DBs).
+    // Child rows under projects (visits, inspections, etc.) cascade on project delete.
+    const { error: projectsErr } = await supabaseAdmin
+      .from("projects")
+      .delete()
+      .eq("client_id", id);
+    if (projectsErr) {
+      return NextResponse.json({ error: projectsErr.message }, { status: 400 });
+    }
+
+    // Activity rows cascade via FK, but clean explicitly for safety.
+    const { error: activityErr } = await supabaseAdmin
+      .from("client_activity")
+      .delete()
+      .eq("client_id", id);
+    if (activityErr) {
+      // Non-fatal; continue with client deletion.
+      console.warn(`DELETE /api/om/clients: could not delete activity for ${id}:`, activityErr);
     }
 
     const { error } = await supabaseAdmin.from("clients").delete().eq("id", id);
