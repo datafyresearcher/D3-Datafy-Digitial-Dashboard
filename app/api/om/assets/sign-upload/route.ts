@@ -20,7 +20,6 @@ async function ensureBucket() {
 
   const { error: createErr } = await admin.storage.createBucket(BUCKET, {
     public: true,
-    fileSizeLimit: "100MB",
   });
 
   if (createErr && !createErr.message.toLowerCase().includes("already exists")) {
@@ -72,6 +71,9 @@ export async function POST(request: Request) {
     );
   } catch (err) {
     console.error("POST /api/om/assets/sign-upload:", err);
-    return NextResponse.json({ error: "Failed to prepare file upload." }, { status: 500 });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to prepare file upload." },
+      { status: 500 }
+    );
   }
 }
