@@ -148,18 +148,40 @@ export default function OmPortalShell({ user }: { user: User }) {
         } ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
         <div
-          className={`flex items-center border-b border-om ${
-            sidebarCollapsed ? "justify-center px-2 py-4" : "justify-between gap-2 px-4 py-5"
+          className={`border-b border-om ${
+            sidebarCollapsed
+              ? "flex flex-col items-center gap-3 px-2 py-3"
+              : "flex items-center justify-between gap-2 px-4 py-5"
           }`}
         >
           <GridSentinelLogo variant={sidebarCollapsed ? "sidebar-collapsed" : "sidebar"} />
-          {!sidebarCollapsed && (
+          {sidebarCollapsed ? (
             <button
-              className="lg:hidden shrink-0 text-om-muted hover:text-om-fg"
-              onClick={() => setSidebarOpen(false)}
+              className="grid place-items-center w-11 h-11 rounded-xl bg-om-surface border border-om text-om-fg hover:bg-om-surface-hover hover:border-brand-500/40 transition-colors shadow-sm shrink-0"
+              onClick={() => setSidebarCollapsed(false)}
+              title="Expand sidebar"
+              aria-label="Expand sidebar"
             >
-              <X className="w-5 h-5" />
+              <PanelLeftOpen className="w-5 h-5" />
             </button>
+          ) : (
+            <>
+              <button
+                className="hidden lg:grid place-items-center w-11 h-11 rounded-xl bg-om-surface border border-om text-om-muted hover:bg-om-surface-hover hover:text-om-fg hover:border-brand-500/40 transition-colors shrink-0"
+                onClick={() => setSidebarCollapsed(true)}
+                title="Collapse sidebar"
+                aria-label="Collapse sidebar"
+              >
+                <PanelLeftClose className="w-5 h-5" />
+              </button>
+              <button
+                className="lg:hidden grid place-items-center w-10 h-10 rounded-lg text-om-muted hover:text-om-fg shrink-0"
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Close sidebar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </>
           )}
         </div>
 
@@ -275,16 +297,6 @@ export default function OmPortalShell({ user }: { user: User }) {
             className={`w-full mb-2 ${sidebarCollapsed ? "justify-center px-2 py-2.5" : "px-4 py-2.5"}`}
           />
           <button
-            onClick={() => setSidebarCollapsed((c) => !c)}
-            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className={`hidden lg:flex w-full items-center gap-2 rounded-xl bg-om-surface border border-om text-sm font-medium text-om-muted hover:bg-om-surface-hover hover:text-om-fg transition-all ${
-              sidebarCollapsed ? "justify-center px-2 py-2.5 mb-2" : "px-4 py-2.5 mb-2"
-            }`}
-          >
-            {sidebarCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
-            {!sidebarCollapsed && <span>Collapse panel</span>}
-          </button>
-          <button
             onClick={handleLogout}
             title="Logout"
             className={`w-full flex items-center justify-center gap-2 rounded-xl bg-om-surface border border-om text-sm font-medium text-om-soft hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-300 transition-all ${
@@ -310,13 +322,6 @@ export default function OmPortalShell({ user }: { user: User }) {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <button
-              className="hidden lg:grid place-items-center w-9 h-9 rounded-lg bg-om-surface text-om-fg shrink-0 hover:bg-om-surface-hover transition-colors"
-              onClick={() => setSidebarCollapsed((c) => !c)}
-              title={sidebarCollapsed ? "Open sidebar" : "Close sidebar"}
-            >
-              {sidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
-            </button>
             {inProjectContext && (
               <button
                 className="hidden sm:grid place-items-center w-9 h-9 rounded-lg bg-om-surface text-om-fg shrink-0 hover:bg-om-surface-hover transition-colors"
@@ -330,7 +335,7 @@ export default function OmPortalShell({ user }: { user: User }) {
             <div className="leading-tight min-w-0">
               <h1 className="font-display font-bold text-lg truncate text-om-fg">{headerTitle}</h1>
               <p className="text-xs text-om-subtle truncate">
-                {user.company} · Signed in as {ROLE_LABEL[user.role]}
+                GridSentinel · Signed in as {ROLE_LABEL[user.role]}
               </p>
             </div>
           </div>

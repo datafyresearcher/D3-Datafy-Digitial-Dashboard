@@ -1,0 +1,62 @@
+---
+pid: 8424
+cwd: "C:\Users\Datafy\OneDrive\Desktop\vibe"
+command: "Stop-Process -Name \"node\" -Force -ErrorAction SilentlyContinue; cmd /c \"rmdir /s /q C:\\Users\\Datafy\\AppData\\Local\\vibe-next\" 2>nul; cd \"C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\" && node scripts/ensure-next-cache.mjs && npm run dev"
+started_at: 2026-06-27T08:28:17.962Z
+running_for_ms: 260012   
+---
+
+> datafy-associate@1.0.0 dev
+> node scripts/ensure-next-cache.mjs && next dev
+
+  ▲ Next.js 14.2.5
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1905ms
+ ○ Compiling / ...
+ ✓ Compiled / in 3.8s (1360 modules)
+ GET / 200 in 4039ms
+ ○ Compiling /portal ...
+ ✓ Compiled /portal in 5.8s (2789 modules)
+ GET /portal 200 in 6078ms
+ GET /portal 200 in 35ms
+[Error: ENOENT: no such file or directory, stat 'C:\Users\Datafy\OneDrive\Desktop\vibe\.next\cache\webpack\server-development\0.pack.gz'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'stat',
+  path: 'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\.next\\cache\\webpack\\server-development\\0.pack.gz'
+}
+ ⨯ unhandledRejection: [Error: ENOENT: no such file or directory, stat 'C:\Users\Datafy\OneDrive\Desktop\vibe\.next\cache\webpack\server-development\0.pack.gz'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'stat',
+  path: 'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\.next\\cache\\webpack\\server-development\\0.pack.gz'
+}
+ ⨯ unhandledRejection: [Error: ENOENT: no such file or directory, stat 'C:\Users\Datafy\OneDrive\Desktop\vibe\.next\cache\webpack\server-development\0.pack.gz'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'stat',
+  path: 'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\.next\\cache\\webpack\\server-development\\0.pack.gz'
+}
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, stat 'C:\Users\Datafy\OneDrive\Desktop\vibe\.next\cache\webpack\server-development\0.pack.gz'
+[Error: ENOENT: no such file or directory, stat 'C:\Users\Datafy\OneDrive\Desktop\vibe\.next\cache\webpack\client-development\1.pack.gz'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'stat',
+  path: 'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\.next\\cache\\webpack\\client-development\\1.pack.gz'
+}
+ ⨯ unhandledRejection: [Error: ENOENT: no such file or directory, stat 'C:\Users\Datafy\OneDrive\Desktop\vibe\.next\cache\webpack\client-development\1.pack.gz'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'stat',
+  path: 'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\.next\\cache\\webpack\\client-development\\1.pack.gz'
+}
+ ⨯ unhandledRejection: [Error: ENOENT: no such file or directory, stat 'C:\Users\Datafy\OneDrive\Desktop\vibe\.next\cache\webpack\client-development\1.pack.gz'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'stat',
+  path: 'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\.next\\cache\\webpack\\client-development\\1.pack.gz'
+}
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, stat 'C:\Users\Datafy\OneDrive\Desktop\vibe\.next\cache\webpack\client-development\1.pack.gz'

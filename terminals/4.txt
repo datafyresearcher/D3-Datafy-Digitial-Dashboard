@@ -1,0 +1,152 @@
+---
+pid: 21948
+cwd: "C:\Users\Datafy\OneDrive\Desktop\vibe"
+command: "cd \"C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\" && node scripts/ensure-next-cache.mjs && npm run dev"
+started_at: 2026-06-27T08:24:50.670Z
+running_for_ms: 475007   
+---
+
+> datafy-associate@1.0.0 dev
+> node scripts/ensure-next-cache.mjs && next dev
+
+  ▲ Next.js 14.2.5
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1545ms
+ ○ Compiling / ...
+ ✓ Compiled / in 4.9s (1328 modules)
+ ⨯ Error: Cannot find module 'next/dist/compiled/next-server/app-page.runtime.dev.js'
+Require stack:
+- C:\Users\Datafy\AppData\Local\vibe-next\.next\server\app\page.js
+- C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\require.js
+- C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\load-components.js
+- C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\build\utils.js
+- C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\dev\hot-middleware.js
+- C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\dev\hot-reloader-webpack.js
+- C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\lib\router-utils\setup-dev-bundler.js
+- C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\lib\router-server.js
+- C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\lib\start-server.js
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1476:15)
+    at C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\require-hook.js:55:36
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1049:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1073:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1094:12)
+    at Module._load (node:internal/modules/cjs/loader:1262:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1576:12)
+    at mod.require (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:153:16)
+    at next/dist/compiled/next-server/app-page.runtime.dev.js (C:\Users\Datafy\AppData\Local\vibe-next\.next\server\app\page.js:88:18)
+    at __webpack_require__ (C:\Users\Datafy\AppData\Local\vibe-next\.next\server\webpack-runtime.js:33:42)
+    at eval (webpack-internal:///(ssr)/./node_modules/next/dist/server/future/route-modules/app-page/module.compiled.js?d969:5:30)
+    at (ssr)/./node_modules/next/dist/server/future/route-modules/app-page/module.compiled.js?d969 (C:\Users\Datafy\AppData\Local\vibe-next\.next\server\vendor-chunks\next.js:2259:1)
+    at __webpack_require__ (C:\Users\Datafy\AppData\Local\vibe-next\.next\server\webpack-runtime.js:33:42)
+    at eval (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fpage&page=%2Fpage&appPaths=%2Fpage&pagePath=private-next-app-dir%2Fpage.tsx&appDir=C%3A%5CUsers%5CDatafy%5COneDrive%5CDesktop%5Cvibe%5Capp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=C%3A%5CUsers%5CDatafy%5COneDrive%5CDesktop%5Cvibe&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!:10:120)
+    at (rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fpage&page=%2Fpage&appPaths=%2Fpage&pagePath=private-next-app-dir%2Fpage.tsx&appDir=C%3A%5CUsers%5CDatafy%5COneDrive%5CDesktop%5Cvibe%5Capp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=C%3A%5CUsers%5CDatafy%5COneDrive%5CDesktop%5Cvibe&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D! (C:\Users\Datafy\AppData\Local\vibe-next\.next\server\app\page.js:99:1)
+    at __webpack_require__ (C:\Users\Datafy\AppData\Local\vibe-next\.next\server\webpack-runtime.js:33:42)
+    at __webpack_exec__ (C:\Users\Datafy\AppData\Local\vibe-next\.next\server\app\page.js:747:39)
+    at C:\Users\Datafy\AppData\Local\vibe-next\.next\server\app\page.js:748:219
+    at __webpack_require__.X (C:\Users\Datafy\AppData\Local\vibe-next\.next\server\webpack-runtime.js:163:21)
+    at C:\Users\Datafy\AppData\Local\vibe-next\.next\server\app\page.js:748:47
+    at Object.<anonymous> (C:\Users\Datafy\AppData\Local\vibe-next\.next\server\app\page.js:751:3)
+    at Module._compile (node:internal/modules/cjs/loader:1830:14)
+    at Object..js (node:internal/modules/cjs/loader:1961:10)
+    at Module.load (node:internal/modules/cjs/loader:1553:32)
+    at Module._load (node:internal/modules/cjs/loader:1355:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1576:12)
+    at mod.require (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:153:16)
+    at requirePage (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\require.js:109:84)
+    at C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\load-components.js:98:84
+    at async loadComponentsImpl (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\load-components.js:98:26)
+    at async DevServer.findPageComponentsImpl (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\next-server.js:710:36)
+    at async DevServer.findPageComponents (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\dev\next-dev-server.js:577:20)
+    at async DevServer.renderPageComponent (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\base-server.js:1917:24)
+    at async DevServer.renderToResponseImpl (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\base-server.js:1969:32)
+    at async DevServer.pipeImpl (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\base-server.js:920:25)
+    at async NextNodeServer.handleCatchallRenderRequest (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\base-server.js:816:17)
+    at async C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\lib\router-server.js:174:21)
+    at async handleRequest (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\lib\router-server.js:353:24)
+    at async requestHandlerImpl (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\lib\router-server.js:377:13)
+    at async Server.requestListener (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\lib\start-server.js:141:13) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\Datafy\\AppData\\Local\\vibe-next\\.next\\server\\app\\page.js',
+    'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\node_modules\\next\\dist\\server\\require.js',
+    'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\node_modules\\next\\dist\\server\\load-components.js',
+    'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\node_modules\\next\\dist\\build\\utils.js',
+    'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\node_modules\\next\\dist\\server\\dev\\hot-middleware.js',
+    'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\node_modules\\next\\dist\\server\\dev\\hot-reloader-webpack.js',
+    'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\node_modules\\next\\dist\\server\\lib\\router-utils\\setup-dev-bundler.js',
+    'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\node_modules\\next\\dist\\server\\lib\\router-server.js',
+    'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\node_modules\\next\\dist\\server\\lib\\start-server.js'
+  ],
+  page: '/'
+}
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 3.3s (1552 modules)
+ ⨯ Error: Cannot find module 'react/jsx-runtime'
+Require stack:
+- C:\Users\Datafy\AppData\Local\vibe-next\.next\server\pages\_document.js
+- C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\require.js
+- C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\load-components.js
+- C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\build\utils.js
+- C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\dev\hot-middleware.js
+- C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\dev\hot-reloader-webpack.js
+- C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\lib\router-utils\setup-dev-bundler.js
+- C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\lib\router-server.js
+- C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\lib\start-server.js
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1476:15)
+    at C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\require-hook.js:55:36
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1049:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1073:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1094:12)
+    at Module._load (node:internal/modules/cjs/loader:1262:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1576:12)
+    at mod.require (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:153:16)
+    at react/jsx-runtime (C:\Users\Datafy\AppData\Local\vibe-next\.next\server\pages\_document.js:42:18)
+    at __webpack_require__ (C:\Users\Datafy\AppData\Local\vibe-next\.next\server\webpack-runtime.js:33:42)
+    at eval (webpack-internal:///./node_modules/next/dist/pages/_document.js:32:21)
+    at ./node_modules/next/dist/pages/_document.js (C:\Users\Datafy\AppData\Local\vibe-next\.next\server\vendor-chunks\next.js:42:1)
+    at __webpack_require__ (C:\Users\Datafy\AppData\Local\vibe-next\.next\server\webpack-runtime.js:33:42)
+    at __webpack_exec__ (C:\Users\Datafy\AppData\Local\vibe-next\.next\server\pages\_document.js:62:39)
+    at C:\Users\Datafy\AppData\Local\vibe-next\.next\server\pages\_document.js:63:104
+    at __webpack_require__.X (C:\Users\Datafy\AppData\Local\vibe-next\.next\server\webpack-runtime.js:163:21)
+    at C:\Users\Datafy\AppData\Local\vibe-next\.next\server\pages\_document.js:63:47
+    at Object.<anonymous> (C:\Users\Datafy\AppData\Local\vibe-next\.next\server\pages\_document.js:66:3)
+    at Module._compile (node:internal/modules/cjs/loader:1830:14)
+    at Object..js (node:internal/modules/cjs/loader:1961:10)
+    at Module.load (node:internal/modules/cjs/loader:1553:32)
+    at Module._load (node:internal/modules/cjs/loader:1355:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1576:12)
+    at mod.require (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:153:16)
+    at requirePage (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\require.js:109:84)
+    at C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\load-components.js:72:65
+    at async Promise.all (index 0)
+    at async loadComponentsImpl (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\load-components.js:71:33)
+    at async DevServer.findPageComponentsImpl (C:\Users\Datafy\OneDrive\Desktop\vibe\node_modules\next\dist\server\next-server.js:710:36) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\Datafy\\AppData\\Local\\vibe-next\\.next\\server\\pages\\_document.js',
+    'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\node_modules\\next\\dist\\server\\require.js',
+    'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\node_modules\\next\\dist\\server\\load-components.js',
+    'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\node_modules\\next\\dist\\build\\utils.js',
+    'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\node_modules\\next\\dist\\server\\dev\\hot-middleware.js',
+    'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\node_modules\\next\\dist\\server\\dev\\hot-reloader-webpack.js',
+    'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\node_modules\\next\\dist\\server\\lib\\router-utils\\setup-dev-bundler.js',
+    'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\node_modules\\next\\dist\\server\\lib\\router-server.js',
+    'C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\\node_modules\\next\\dist\\server\\lib\\start-server.js'
+  ]
+}
+ GET / 500 in 8994ms

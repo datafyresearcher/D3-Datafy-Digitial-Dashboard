@@ -1,0 +1,32 @@
+---
+pid: 23712
+cwd: "C:\Users\Datafy\OneDrive\Desktop\vibe"
+command: "Stop-Process -Name \"node\" -Force -ErrorAction SilentlyContinue; cd \"C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\" && npm run dev"
+started_at: 2026-06-27T08:27:16.654Z
+running_for_ms: 325013   
+---
+
+> datafy-associate@1.0.0 dev
+> node scripts/ensure-next-cache.mjs && next dev
+
+  ▲ Next.js 14.2.5
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1792ms
+ ○ Compiling / ...
+ ✓ Compiled / in 5.6s (1363 modules)
+ GET / 200 in 5695ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /_next/static/webpack/51730f8ac9292bea.webpack.hot-update.json 404 in 5764ms
+ GET / 200 in 85ms
+ ○ Compiling /portal/login ...
+ ✓ Compiled /portal/login in 942ms (1496 modules)
+ ○ Compiling /portal ...
+ ✓ Compiled /portal in 3s (2790 modules)
+ ○ Compiling /api/om/store ...
+ ✓ Compiled /api/om/store in 785ms (1506 modules)
+ GET /api/om/store 200 in 1801ms
+ GET /portal 200 in 160ms
+ GET /portal 200 in 35ms

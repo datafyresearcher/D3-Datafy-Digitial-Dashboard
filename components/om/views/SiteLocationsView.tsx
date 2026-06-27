@@ -7,18 +7,34 @@ import {
   Crosshair,
   Eye,
   EyeOff,
+  Globe,
   Layers3,
   LocateFixed,
+  Maximize2,
+  Menu,
+  Minimize2,
   RotateCcw,
   Sun,
   Search,
-  PanelLeftClose,
-  PanelLeftOpen,
+  PanelRightClose,
 } from "lucide-react";
 import type { User } from "@/lib/auth";
 import type { Store, Project } from "@/lib/om";
 import { visibleProjects } from "@/lib/om";
-import { getOmMapConfig } from "@/lib/om-map-style";
+import { getOmMapConfig, type OmMapProvider } from "@/lib/om-map-style";
+
+function getMapAttribution(provider: OmMapProvider): string {
+  switch (provider) {
+    case "mapbox":
+      return "© Mapbox © OpenStreetMap";
+    case "maptiler":
+      return "© MapTiler © OpenStreetMap contributors";
+    case "esri":
+      return "Tiles © Esri";
+    default:
+      return "";
+  }
+}
 function getGlobeCamera(embedded: boolean) {
   return {
     center: [0, 18] as [number, number],
@@ -117,6 +133,24 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
+function NorthArrowIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} aria-hidden="true">
+      <text x="8" y="6.5" textAnchor="middle" fontSize="6.5" fontWeight="800" fill="currentColor">
+        N
+      </text>
+      <path
+        d="M8 7.5v5.5M8 13l-2.25-2.25M8 13l2.25-2.25"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function escapeHtml(value: unknown): string {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -127,11 +161,11 @@ function escapeHtml(value: unknown): string {
 }
 
 function getResponsivePadding(): maplibregl.PaddingOptions {
-  if (typeof window === "undefined") return { top: 92, right: 92, bottom: 88, left: 352 };
+  if (typeof window === "undefined") return { top: 92, right: 92, bottom: 88, left: 48 };
   const isMobile = window.innerWidth < 768;
   return isMobile
-    ? { top: 220, right: 28, bottom: 40, left: 28 }
-    : { top: 96, right: 112, bottom: 92, left: 368 };
+    ? { top: 120, right: 28, bottom: 40, left: 28 }
+    : { top: 96, right: 80, bottom: 92, left: 48 };
 }
 
 function normalizeMatch(value: unknown): string {
@@ -201,7 +235,9 @@ export default function SiteLocationsView({
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [visibleProjectIds, setVisibleProjectIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  const [panelCollapsed, setPanelCollapsed] = useState(false);
+  const [panelCollapsed, setPanelCollapsed] = useState(embedded);
+  const [globeEnabled, setGlobeEnabled] = useState(true);
+  const [fullWindow, setFullWindow] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const mapConfig = useMemo(() => getOmMapConfig(), []);
@@ -272,6 +308,7 @@ export default function SiteLocationsView({
     const map = mapRef.current;
     if (!map) return;
 
+    setGlobeEnabled(true);
     setActiveProjectId("globe-view");
     applyGlobeAtmosphere(map);
     map.setPadding({ top: 0, right: 0, bottom: 0, left: 0 });
@@ -291,6 +328,7 @@ export default function SiteLocationsView({
     const map = mapRef.current;
     if (!map || !bounds || bounds.isEmpty()) return;
 
+    setGlobeEnabled(false);
     setActiveProjectId("all-sites");
     try {
       map.setProjection({ type: "mercator" });
@@ -320,6 +358,7 @@ export default function SiteLocationsView({
     if (!map) return;
 
     clearIntro();
+    setGlobeEnabled(false);
     setActiveProjectId(project.id);
     try {
       map.setProjection({ type: "mercator" });
@@ -330,7 +369,7 @@ export default function SiteLocationsView({
 
     if (boundary) {
       map.fitBounds(getBoundaryBounds(boundary), {
-        padding: { top: 150, right: 180, bottom: 130, left: 380 },
+        padding: { top: 150, right: 80, bottom: 130, left: 80 },
         maxZoom: mapConfig.maxSiteZoom,
         pitch: SITE_CAMERA.pitch,
         bearing: SITE_CAMERA.bearing,
@@ -371,7 +410,7 @@ export default function SiteLocationsView({
         const boundary = getBoundaryForProject(project, clientById.get(project.clientId));
         if (boundary) {
           map.fitBounds(getBoundaryBounds(boundary), {
-            padding: { top: 150, right: 180, bottom: 130, left: 380 },
+            padding: { top: 150, right: 80, bottom: 130, left: 80 },
             maxZoom: mapConfig.maxSiteZoom,
             pitch: SITE_CAMERA.pitch,
             bearing: SITE_CAMERA.bearing,
@@ -388,6 +427,7 @@ export default function SiteLocationsView({
             essential: true,
           });
         }
+        setGlobeEnabled(false);
         await sleep(INTRO_PROJECT_DURATION_MS + INTRO_PROJECT_HOLD_MS, abort.signal);
       }
 
@@ -414,6 +454,39 @@ export default function SiteLocationsView({
       focusProject(entry.project);
     }
   };
+
+  const resetNorth = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    map.easeTo({
+      bearing: 0,
+      duration: 600,
+      essential: true,
+    });
+  }, []);
+
+  const toggleGlobeView = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    clearIntro();
+    if (globeEnabled) {
+      setGlobeEnabled(false);
+      setActiveProjectId("all-sites");
+      try {
+        map.setProjection({ type: "mercator" });
+      } catch {
+        // Keep current projection when mercator is unavailable.
+      }
+      if (bounds && !bounds.isEmpty()) {
+        focusAllSites(1100);
+      }
+      return;
+    }
+
+    focusGlobeView(1100);
+  }, [bounds, focusAllSites, focusGlobeView, globeEnabled]);
 
   const toggleProjectVisibility = (projectId: string) => {
     setVisibleProjectIds((current) => {
@@ -452,10 +525,10 @@ export default function SiteLocationsView({
       pitch: initialCamera.pitch,
       bearing: initialCamera.bearing,
       maxZoom: mapConfig.maxMapZoom,
+      attributionControl: false,
     });
 
     mapRef.current = map;
-    map.addControl(new maplibregl.NavigationControl(), "top-right");
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 140, unit: "metric" }), "bottom-right");
     const loadingFallback = window.setTimeout(() => setLoading(false), 9000);
 
@@ -546,7 +619,7 @@ export default function SiteLocationsView({
       window.clearTimeout(loadingFallback);
       setLoading(false);
       if (embedded) {
-        focusAllSites(900);
+        focusGlobeView(900);
       } else {
         runIntroTour();
       }
@@ -564,11 +637,20 @@ export default function SiteLocationsView({
       map.remove();
       mapRef.current = null;
     };
-  }, [clientById, embedded, focusAllSites, focusProject, mapConfig, projects, runIntroTour]);
+  }, [clientById, embedded, focusAllSites, focusGlobeView, focusProject, mapConfig, projects, runIntroTour]);
 
   useEffect(() => {
     mapRef.current?.resize();
-  }, [panelCollapsed]);
+  }, [panelCollapsed, fullWindow]);
+
+  useEffect(() => {
+    if (!fullWindow) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFullWindow(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [fullWindow]);
 
   useEffect(() => {
     if (!embedded || !mapContainerRef.current || !mapRef.current) return;
@@ -606,19 +688,25 @@ export default function SiteLocationsView({
   return (
     <div
       className={
-        embedded
+        fullWindow
+          ? "fixed inset-0 z-[100] h-screen bg-slate-950"
+          : embedded
           ? "h-[min(520px,55vh)] min-h-[400px] rounded-2xl overflow-hidden border border-om"
           : "-m-5 h-[calc(100vh-73px)] min-h-[680px] lg:-m-8"
       }
     >
-      <div className={`om-geospatial-container${embedded ? " om-geospatial-container--embedded" : ""}`}>
+      <div
+        className={`om-geospatial-layout${embedded ? " om-geospatial-layout--embedded" : ""}${
+          fullWindow ? " om-geospatial-layout--fullwindow" : ""
+        }`}
+      >
         <style>{`
           @keyframes om-geospatial-spin {
             to { transform: rotate(360deg); }
           }
 
-          .om-geospatial-container {
-            position: relative;
+          .om-geospatial-layout {
+            display: flex;
             width: 100%;
             height: 100%;
             min-height: 680px;
@@ -626,34 +714,158 @@ export default function SiteLocationsView({
             background: #020617;
           }
 
-          .om-geospatial-container--embedded {
+          .om-geospatial-layout--embedded {
             min-height: 400px;
           }
 
-          .om-geospatial-container > .h-full {
+          .om-geospatial-layout--fullwindow {
+            min-height: 100vh;
+          }
+
+          .om-geospatial-map-area {
+            position: relative;
+            flex: 1;
+            min-width: 0;
+            min-height: inherit;
+            overflow: hidden;
+          }
+
+          .om-geospatial-map-area > .h-full {
             height: 100%;
           }
 
-          .om-geospatial-container .maplibregl-map {
+          .om-geospatial-map-area .maplibregl-map {
             width: 100% !important;
             height: 100% !important;
             font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           }
 
-          .om-geospatial-panel {
+          .om-geospatial-map-area .maplibregl-ctrl-bottom-right {
+            bottom: 40px;
+            right: 8px;
+            z-index: 5;
+          }
+
+          .om-geospatial-map-footer {
             position: absolute;
-            top: 16px;
-            left: 16px;
+            bottom: 0;
+            left: 0;
+            right: 0;
             z-index: 12;
-            width: min(300px, calc(100vw - 32px));
-            max-height: calc(100% - 32px);
-            overflow: auto;
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            border-radius: 8px;
-            background: rgba(15, 23, 42, 0.82);
-            box-shadow: 0 22px 55px rgba(2, 6, 23, 0.42);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            min-height: 34px;
+            padding: 6px 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(2, 6, 23, 0.94);
+            backdrop-filter: blur(12px);
+            pointer-events: auto;
+          }
+
+          .om-geospatial-map-footer-attrib {
+            flex: 1;
+            min-width: 0;
+            color: #cbd5e1;
+            font-size: 10px;
+            line-height: 1.35;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+
+          .om-geospatial-map-footer-basemap {
             color: #f8fafc;
-            backdrop-filter: blur(16px);
+            font-weight: 700;
+          }
+
+          .om-geospatial-map-footer-replay {
+            display: inline-flex;
+            flex-shrink: 0;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.88);
+            color: #f8fafc;
+            padding: 6px 10px;
+            font-size: 11px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: background 160ms ease, border-color 160ms ease;
+          }
+
+          .om-geospatial-map-footer-replay:hover {
+            background: rgba(30, 41, 59, 0.95);
+            border-color: rgba(45, 212, 191, 0.45);
+          }
+
+          .om-geospatial-sidebar {
+            flex-shrink: 0;
+            display: flex;
+            border-left: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(15, 23, 42, 0.96);
+            color: #f8fafc;
+          }
+
+          .om-geospatial-sidebar--collapsed {
+            width: 48px;
+          }
+
+          .om-geospatial-sidebar--expanded {
+            width: min(348px, 42vw);
+          }
+
+          .om-geospatial-sidebar-rail {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 10px;
+            width: 48px;
+            flex-shrink: 0;
+            padding: 12px 7px;
+            height: 100%;
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+            background: #020617;
+          }
+
+          .om-geospatial-rail-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: 4px;
+            background: transparent;
+            color: #f8fafc;
+            cursor: pointer;
+            transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+          }
+
+          .om-geospatial-rail-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #ffffff;
+          }
+
+          .om-geospatial-rail-btn.is-active {
+            color: #60a5fa;
+          }
+
+          .om-geospatial-rail-btn--menu {
+            margin-top: auto;
+          }
+
+          .om-geospatial-panel {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-width: 0;
+            height: 100%;
+            overflow: auto;
+            color: #f8fafc;
           }
 
           .om-geospatial-panel-header {
@@ -688,32 +900,6 @@ export default function SiteLocationsView({
             background: rgba(255, 255, 255, 0.15);
             border-color: rgba(255, 255, 255, 0.26);
             color: #f8fafc;
-          }
-
-          .om-geospatial-panel-expand {
-            position: absolute;
-            top: 16px;
-            left: 16px;
-            z-index: 12;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            border-radius: 8px;
-            background: rgba(15, 23, 42, 0.88);
-            color: #f8fafc;
-            padding: 10px 12px;
-            font-size: 12px;
-            font-weight: 800;
-            box-shadow: 0 18px 42px rgba(2, 6, 23, 0.32);
-            backdrop-filter: blur(16px);
-            cursor: pointer;
-            transition: background 160ms ease, border-color 160ms ease;
-          }
-
-          .om-geospatial-panel-expand:hover {
-            background: rgba(30, 41, 59, 0.95);
-            border-color: rgba(45, 212, 191, 0.45);
           }
 
           .om-geospatial-search {
@@ -893,7 +1079,7 @@ export default function SiteLocationsView({
           .om-geospatial-facts {
             position: absolute;
             top: 16px;
-            right: 58px;
+            right: 16px;
             z-index: 10;
             max-width: 320px;
             border: 1px solid rgba(255, 255, 255, 0.2);
@@ -951,69 +1137,56 @@ export default function SiteLocationsView({
             line-height: 1.4;
           }
 
-          .om-geospatial-replay {
-            position: absolute;
-            right: 58px;
-            bottom: 20px;
-            z-index: 10;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.22);
-            border-radius: 8px;
-            background: rgba(15, 23, 42, 0.82);
-            color: #f8fafc;
-            padding: 10px 12px;
-            font-size: 13px;
-            font-weight: 800;
-            box-shadow: 0 18px 42px rgba(2, 6, 23, 0.26);
-            backdrop-filter: blur(14px);
+          .om-geospatial-layout--embedded .om-geospatial-sidebar--expanded {
+            width: min(260px, 42vw);
           }
 
-          .om-geospatial-container--embedded .om-geospatial-panel {
-            width: min(260px, calc(100% - 24px));
-            max-height: calc(100% - 24px);
-          }
-
-          .om-geospatial-container--embedded .om-geospatial-facts {
+          .om-geospatial-layout--embedded .om-geospatial-facts {
             display: none;
           }
 
-          .om-geospatial-container--embedded .om-geospatial-replay {
-            right: 12px;
-            bottom: 12px;
-            padding: 8px 10px;
-            font-size: 11px;
+          .om-geospatial-layout--embedded .om-geospatial-map-footer {
+            padding: 5px 10px;
+            gap: 8px;
           }
 
-          .om-geospatial-basemap-badge {
-            position: absolute;
-            bottom: 12px;
-            left: 12px;
-            z-index: 10;
-            max-width: min(280px, calc(100% - 24px));
-            border: 1px solid rgba(255, 255, 255, 0.16);
-            border-radius: 6px;
-            background: rgba(15, 23, 42, 0.82);
-            color: #cbd5e1;
-            padding: 6px 10px;
+          .om-geospatial-layout--embedded .om-geospatial-map-footer-replay {
+            padding: 5px 8px;
             font-size: 10px;
-            line-height: 1.35;
-            backdrop-filter: blur(12px);
-          }
-
-          .om-geospatial-basemap-badge strong {
-            color: #f8fafc;
-            font-weight: 700;
           }
 
           @media (max-width: 767px) {
-            .om-geospatial-panel {
-              top: 10px;
-              left: 10px;
-              right: 10px;
-              width: auto;
+            .om-geospatial-layout {
+              flex-direction: column;
+            }
+
+            .om-geospatial-sidebar {
+              border-left: none;
+              border-top: 1px solid rgba(255, 255, 255, 0.12);
+            }
+
+            .om-geospatial-sidebar--collapsed {
+              width: 100%;
+              height: 48px;
+            }
+
+            .om-geospatial-sidebar--expanded {
+              width: 100%;
               max-height: 42%;
+            }
+
+            .om-geospatial-sidebar-rail {
+              flex-direction: row;
+              width: 100%;
+              height: auto;
+              padding: 6px 10px;
+              border-right: none;
+              border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            }
+
+            .om-geospatial-rail-btn--menu {
+              margin-top: 0;
+              margin-left: auto;
             }
 
             .om-geospatial-facts {
@@ -1024,158 +1197,215 @@ export default function SiteLocationsView({
               grid-template-columns: minmax(0, 1fr) 38px;
             }
 
-            .om-geospatial-replay {
-              right: 12px;
-              bottom: 12px;
+            .om-geospatial-map-footer {
+              flex-wrap: wrap;
+              row-gap: 6px;
+            }
+
+            .om-geospatial-map-footer-attrib {
+              white-space: normal;
             }
           }
         `}</style>
 
-        <div ref={mapContainerRef} className="h-full w-full" />
+        <div className="om-geospatial-map-area">
+          <div ref={mapContainerRef} className="h-full w-full" />
 
-        {panelCollapsed ? (
-          <button
-            type="button"
-            className="om-geospatial-panel-expand"
-            onClick={() => setPanelCollapsed(false)}
-            title="Expand Geospatial Layers"
-            aria-label="Expand Geospatial Layers"
-          >
-            <PanelLeftOpen className="h-4 w-4 text-emerald-300" />
-            <span>Geospatial Layers</span>
-          </button>
-        ) : (
-          <aside className="om-geospatial-panel" aria-label="Geospatial layer controls">
-            <div className="om-geospatial-panel-header">
-              <Crosshair className="h-5 w-5 text-emerald-300 shrink-0" />
-              <div className="om-geospatial-panel-header-copy">
-                <div className="om-geospatial-panel-title">Geospatial Layers</div>
-                <div className="om-geospatial-panel-subtitle">Toggle sites or focus the client location view.</div>
-              </div>
-              <button
-                type="button"
-                className="om-geospatial-panel-minimize"
-                onClick={() => setPanelCollapsed(true)}
-                title="Minimize panel"
-                aria-label="Minimize Geospatial Layers panel"
-              >
-                <PanelLeftClose className="h-4 w-4" />
-              </button>
+          <div className="om-geospatial-facts">
+            <div className="text-[13px] font-extrabold uppercase text-sky-600">O&amp;M Site Facts</div>
+            <div className="mt-1.5 text-sm leading-snug">
+              {projects.length} monitored site{projects.length === 1 ? "" : "s"};{" "}
+              {totalCapacity.toLocaleString()} kWp installed capacity.
             </div>
-
-            <div className="om-geospatial-search">
-              <p className="om-geospatial-search-label">
-                <Search className="h-3.5 w-3.5" />
-                Search Projects
-              </p>
-              <div className="om-geospatial-search-field">
-                <Search className="om-geospatial-search-icon" />
-                <input
-                  type="search"
-                  className="om-geospatial-search-input"
-                  placeholder="Search by name, client, or location…"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && filteredProjects[0]) {
-                      focusProject(filteredProjects[0]);
-                    }
-                  }}
-                />
-              </div>
-              {searchQuery.trim() && (
-                <p className="om-geospatial-search-hint">
-                  {filteredProjects.length} match{filteredProjects.length === 1 ? "" : "es"}
-                  {filteredProjects.length > 0 ? " — press Enter to focus first result" : ""}
-                </p>
+            <div className="mt-2 text-xs text-slate-300">
+              {totalPanels.toLocaleString()} panels under client-visible monitoring.
+            </div>
+            <div className="mt-2 pt-2 border-t border-om text-[11px] text-slate-400">
+              Basemap: <span className="text-slate-200">{mapConfig.label}</span>
+              {mapConfig.provider === "esri" && (
+                <span className="block mt-1 text-amber-300/90">
+                  Add <code className="text-[10px]">NEXT_PUBLIC_MAPBOX_TOKEN</code> to .env.local for HD zoom on site boundaries.
+                </span>
               )}
             </div>
-
-            {(["Client Site Locations", "Map View"] as const).map((group) => (
-              <div className="om-geospatial-group" key={group}>
-                <div className="om-geospatial-group-title">{group}</div>
-                {group === "Client Site Locations" && searchQuery.trim() && groupedEntries[group].length === 0 && (
-                  <p className="px-2 pb-2 text-[11px] text-slate-400">No projects match your search.</p>
-                )}
-                {groupedEntries[group].map((entry) => (
-                  <div className="om-geospatial-row" key={entry.id}>
-                    <button
-                      type="button"
-                      className={`om-geospatial-toggle${entry.visible ? "" : " is-hidden"}${
-                        activeProjectId === entry.id ? " is-active" : ""
-                      }`}
-                      onClick={() =>
-                        entry.project ? toggleProjectVisibility(entry.project.id) : focusEntry(entry)
-                      }
-                      aria-pressed={entry.visible}
-                    >
-                      <span className="om-geospatial-swatch" style={{ backgroundColor: entry.color }} />
-                      <span className="om-geospatial-copy">
-                        <span className="om-geospatial-name">
-                          {entry.project ? <Sun className="h-4 w-4" /> : <Layers3 className="h-4 w-4" />}
-                          <span>{entry.label}</span>
-                          {entry.project ? (
-                            entry.visible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />
-                          ) : null}
-                        </span>
-                        <span className="om-geospatial-detail">{entry.detail}</span>
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className="om-geospatial-focus"
-                      onClick={() => focusEntry(entry)}
-                      title={`Focus ${entry.label}`}
-                      aria-label={`Focus ${entry.label}`}
-                    >
-                      <LocateFixed className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </aside>
-        )}
-
-        <div className="om-geospatial-facts">
-          <div className="text-[13px] font-extrabold uppercase text-sky-600">O&amp;M Site Facts</div>
-          <div className="mt-1.5 text-sm leading-snug">
-            {projects.length} monitored site{projects.length === 1 ? "" : "s"};{" "}
-            {totalCapacity.toLocaleString()} kWp installed capacity.
           </div>
-          <div className="mt-2 text-xs text-slate-300">
-            {totalPanels.toLocaleString()} panels under client-visible monitoring.
-          </div>
-          <div className="mt-2 pt-2 border-t border-om text-[11px] text-slate-400">
-            Basemap: <span className="text-slate-200">{mapConfig.label}</span>
-            {mapConfig.provider === "esri" && (
-              <span className="block mt-1 text-amber-300/90">
-                Add <code className="text-[10px]">NEXT_PUBLIC_MAPBOX_TOKEN</code> to .env.local for HD zoom on site boundaries.
-              </span>
-            )}
-          </div>
-        </div>
 
-        <div className="om-geospatial-basemap-badge">
-          Basemap: <strong>{mapConfig.label}</strong>
-          {mapConfig.provider === "esri" && (
-            <span className="block text-amber-300/90 mt-0.5">
-              Set NEXT_PUBLIC_MAPBOX_TOKEN in .env.local for high-detail site zoom.
-            </span>
+          <div className="om-geospatial-map-footer">
+            <div className="om-geospatial-map-footer-attrib" title={`${mapConfig.label} · ${getMapAttribution(mapConfig.provider)} | MapLibre`}>
+              {embedded ? (
+                <>
+                  <span className="om-geospatial-map-footer-basemap">{mapConfig.label}</span>
+                  {" · "}
+                </>
+              ) : null}
+              {getMapAttribution(mapConfig.provider)} | MapLibre
+            </div>
+            <button type="button" className="om-geospatial-map-footer-replay" onClick={runIntroTour}>
+              <RotateCcw className="h-3.5 w-3.5" />
+              Replay slow tour
+            </button>
+          </div>
+
+          {loading && (
+            <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-slate-950/50">
+              <div className="h-11 w-11 rounded-full border-4 border-white/25 border-l-emerald-300 animate-[om-geospatial-spin_1s_linear_infinite]" />
+            </div>
           )}
         </div>
 
-        <button type="button" className="om-geospatial-replay" onClick={runIntroTour}>
-          <RotateCcw className="h-4 w-4" />
-          Replay slow tour
-        </button>
-
-        {loading && (
-          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-slate-950/50">
-            <div className="h-11 w-11 rounded-full border-4 border-white/25 border-l-emerald-300 animate-[om-geospatial-spin_1s_linear_infinite]" />
+        <aside
+          className={`om-geospatial-sidebar${
+            panelCollapsed ? " om-geospatial-sidebar--collapsed" : " om-geospatial-sidebar--expanded"
+          }`}
+          aria-label="Geospatial layer controls"
+        >
+          <div className="om-geospatial-sidebar-rail">
+            <button
+              type="button"
+              className={`om-geospatial-rail-btn${fullWindow ? " is-active" : ""}`}
+              onClick={() => setFullWindow((current) => !current)}
+              title={fullWindow ? "Exit full window view" : "Open full window view"}
+              aria-label={fullWindow ? "Exit full window view" : "Open full window view"}
+              aria-pressed={fullWindow}
+            >
+              {fullWindow ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </button>
+            <button
+              type="button"
+              className="om-geospatial-rail-btn"
+              onClick={resetNorth}
+              title="Reset map to north"
+              aria-label="Reset map to north"
+            >
+              <NorthArrowIcon className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              className={`om-geospatial-rail-btn${globeEnabled ? " is-active" : ""}`}
+              onClick={toggleGlobeView}
+              title={globeEnabled ? "Turn globe view off" : "Turn globe view on"}
+              aria-label={globeEnabled ? "Turn globe view off" : "Turn globe view on"}
+              aria-pressed={globeEnabled}
+            >
+              <Globe className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              className="om-geospatial-rail-btn"
+              onClick={() => setPanelCollapsed(false)}
+              title="Open layer list"
+              aria-label="Open layer list"
+              aria-expanded={!panelCollapsed}
+            >
+              <Layers3 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              className="om-geospatial-rail-btn om-geospatial-rail-btn--menu"
+              onClick={() => setPanelCollapsed((current) => !current)}
+              title={panelCollapsed ? "Open layers menu" : "Close layers menu"}
+              aria-label={panelCollapsed ? "Open layers menu" : "Close layers menu"}
+              aria-expanded={!panelCollapsed}
+            >
+              <Menu className="h-4 w-4" />
+            </button>
           </div>
-        )}
 
+          {!panelCollapsed ? (
+            <div className="om-geospatial-panel">
+              <div className="om-geospatial-panel-header">
+                <Crosshair className="h-5 w-5 text-emerald-300 shrink-0" />
+                <div className="om-geospatial-panel-header-copy">
+                  <div className="om-geospatial-panel-title">Geospatial Layers</div>
+                  <div className="om-geospatial-panel-subtitle">Toggle sites or focus the client location view.</div>
+                </div>
+                <button
+                  type="button"
+                  className="om-geospatial-panel-minimize"
+                  onClick={() => setPanelCollapsed(true)}
+                  title="Collapse panel"
+                  aria-label="Collapse Geospatial Layers panel"
+                >
+                  <PanelRightClose className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="om-geospatial-search">
+                <p className="om-geospatial-search-label">
+                  <Search className="h-3.5 w-3.5" />
+                  Search Projects
+                </p>
+                <div className="om-geospatial-search-field">
+                  <Search className="om-geospatial-search-icon" />
+                  <input
+                    type="search"
+                    className="om-geospatial-search-input"
+                    placeholder="Search by name, client, or location…"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && filteredProjects[0]) {
+                        focusProject(filteredProjects[0]);
+                      }
+                    }}
+                  />
+                </div>
+                {searchQuery.trim() && (
+                  <p className="om-geospatial-search-hint">
+                    {filteredProjects.length} match{filteredProjects.length === 1 ? "" : "es"}
+                    {filteredProjects.length > 0 ? " — press Enter to focus first result" : ""}
+                  </p>
+                )}
+              </div>
+
+              {(["Client Site Locations", "Map View"] as const).map((group) => (
+                <div className="om-geospatial-group" key={group}>
+                  <div className="om-geospatial-group-title">{group}</div>
+                  {group === "Client Site Locations" && searchQuery.trim() && groupedEntries[group].length === 0 && (
+                    <p className="px-2 pb-2 text-[11px] text-slate-400">No projects match your search.</p>
+                  )}
+                  {groupedEntries[group].map((entry) => (
+                    <div className="om-geospatial-row" key={entry.id}>
+                      <button
+                        type="button"
+                        className={`om-geospatial-toggle${entry.visible ? "" : " is-hidden"}${
+                          activeProjectId === entry.id || (entry.id === "globe-view" && globeEnabled)
+                            ? " is-active"
+                            : ""
+                        }`}
+                        onClick={() =>
+                          entry.project ? toggleProjectVisibility(entry.project.id) : focusEntry(entry)
+                        }
+                        aria-pressed={entry.visible}
+                      >
+                        <span className="om-geospatial-swatch" style={{ backgroundColor: entry.color }} />
+                        <span className="om-geospatial-copy">
+                          <span className="om-geospatial-name">
+                            {entry.project ? <Sun className="h-4 w-4" /> : <Layers3 className="h-4 w-4" />}
+                            <span>{entry.label}</span>
+                            {entry.project ? (
+                              entry.visible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />
+                            ) : null}
+                          </span>
+                          <span className="om-geospatial-detail">{entry.detail}</span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className="om-geospatial-focus"
+                        onClick={() => focusEntry(entry)}
+                        title={`Focus ${entry.label}`}
+                        aria-label={`Focus ${entry.label}`}
+                      >
+                        <LocateFixed className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </aside>
       </div>
     </div>
   );

@@ -1,0 +1,18 @@
+---
+pid: 26992
+cwd: "C:\Users\Datafy\OneDrive\Desktop\vibe"
+command: "cd \"C:\\Users\\Datafy\\OneDrive\\Desktop\\vibe\" && node scripts/ensure-next-cache.mjs && npm run dev"
+started_at: 2026-06-27T08:29:46.355Z
+running_for_ms: 150014   
+---
+
+> datafy-associate@1.0.0 dev
+> node scripts/ensure-next-cache.mjs && next dev
+
+  ▲ Next.js 14.2.5
+ ⚠ Port 3000 is in use, trying 3001 instead.
+  - Local:        http://localhost:3001
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1399ms
