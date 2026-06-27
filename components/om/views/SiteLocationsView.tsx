@@ -384,7 +384,8 @@ export default function SiteLocationsView({
 
     map.fitBounds(bounds, {
       padding: getResponsivePadding(),
-      maxZoom: projects.length === 1 ? 13.4 : 7,
+      // For a single small site (e.g. rooftop) allow much closer zoom to reach 5-10 m scale.
+      maxZoom: projects.length === 1 ? 19 : 14,
       pitch: SITE_CAMERA.pitch,
       bearing: SITE_CAMERA.bearing,
       duration,
@@ -425,7 +426,7 @@ export default function SiteLocationsView({
     } else {
       map.flyTo({
         center: [project.lng, project.lat],
-        zoom: Math.min(13.5, mapConfig.maxSiteZoom),
+        zoom: Math.min(19, mapConfig.maxSiteZoom),
         pitch: SITE_CAMERA.pitch,
         bearing: SITE_CAMERA.bearing,
         duration,
@@ -466,7 +467,7 @@ export default function SiteLocationsView({
         } else {
           map.flyTo({
             center: [project.lng, project.lat],
-            zoom: Math.min(13.3, mapConfig.maxSiteZoom),
+            zoom: Math.min(19, mapConfig.maxSiteZoom),
             pitch: SITE_CAMERA.pitch,
             bearing: SITE_CAMERA.bearing,
             duration: INTRO_PROJECT_DURATION_MS,
@@ -740,7 +741,8 @@ export default function SiteLocationsView({
         if (b) {
           map.fitBounds(getBoundaryBounds(b), {
             padding: { top: 28, right: 28, bottom: 52, left: 28 },
-            maxZoom: mapConfig.maxSiteZoom,
+            // Force close zoom for orthomosaic detail view (target 5-10 m scale even on free Esri fallback).
+            maxZoom: Math.max(19, mapConfig.maxSiteZoom),
             pitch: SITE_CAMERA.pitch,
             bearing: SITE_CAMERA.bearing,
             duration: 620,
@@ -749,7 +751,7 @@ export default function SiteLocationsView({
         } else {
           map.flyTo({
             center: [proj.lng, proj.lat],
-            zoom: 16.2,
+            zoom: 19,
             pitch: 52,
             bearing: -18,
             duration: 620,
@@ -1362,7 +1364,7 @@ export default function SiteLocationsView({
               Basemap: <span className="text-slate-200">{mapConfig.label}</span>
               {mapConfig.provider === "esri" && (
                 <span className="block mt-1 text-amber-300/90">
-                  Add <code className="text-[10px]">NEXT_PUBLIC_MAPBOX_TOKEN</code> to .env.local for HD zoom on site boundaries.
+                  Set NEXT_PUBLIC_MAPBOX_TOKEN (or NEXT_PUBLIC_MAPTILER_API_KEY) in your hosting env for native HD zoom.
                 </span>
               )}
             </div>

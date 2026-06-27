@@ -12,7 +12,10 @@ export type OmMapConfig = {
   maxMapZoom: number;
 };
 
-/** Esri World Imagery is reliable only to ~zoom 17 in many regions (Pakistan included). */
+/**
+ * Esri World Imagery native tiles are typically reliable only to ~zoom 17 in many regions (incl. Pakistan).
+ * We raise the map maxZooms so the UI can overzoom (upscale last tiles) to reach ~5-10 m effective scale.
+ */
 const ESRI_SATELLITE_MAX_ZOOM = 17;
 
 const ESRI_HYBRID_STYLE: StyleSpecification = {
@@ -113,7 +116,9 @@ export function getOmMapConfig(): OmMapConfig {
     style: ESRI_HYBRID_STYLE,
     provider: "esri",
     label: "Esri World Imagery + Carto Labels (free)",
-    maxSiteZoom: ESRI_SATELLITE_MAX_ZOOM,
-    maxMapZoom: ESRI_SATELLITE_MAX_ZOOM + 1,
+    // Allow deep zoom (overzoom) for close inspection of orthomosaics and small sites.
+    // 5-10 m scale is reachable (tiles will be upscaled beyond native ~17).
+    maxSiteZoom: 20,
+    maxMapZoom: 22,
   };
 }
