@@ -30,6 +30,7 @@ import {
   healthScore,
   uid,
 } from "@/lib/om";
+import { uploadOmAsset } from "@/lib/om-assets";
 import { canUpload } from "../perms";
 import {
   Button,
@@ -296,14 +297,28 @@ function VisitForm({ open, onClose, project, user }: { open: boolean; onClose: (
   const [defects, setDefects] = useState<DefectEntry[]>([]);
   const [defCat, setDefCat] = useState<DefectEntry["category"]>("Soiling");
   const [defDesc, setDefDesc] = useState("");
+  const [uploadingCount, setUploadingCount] = useState(0);
 
   const uploadImages = async (files: FileList | null, kind: "before" | "after", tag: string) => {
     if (!files) return;
-    const out: VisitImage[] = [];
     for (const f of Array.from(files)) {
-      out.push({ id: uid("img"), url: await fileToDataUrl(f), tag, kind });
+      const tempId = uid("img");
+      // optimistic local preview using data url for instant feedback
+      const localUrl = await fileToDataUrl(f);
+      const tempImg: VisitImage = { id: tempId, url: localUrl, tag, kind };
+      setImages((prev) => [...prev, tempImg]);
+
+      setUploadingCount((c) => c + 1);
+      try {
+        const finalUrl = await uploadOmAsset(f, project.id, "visit");
+        setImages((prev) => prev.map((x) => (x.id === tempId ? { ...x, url: finalUrl } : x)));
+      } catch (e) {
+        console.error("Visit image upload failed:", e);
+        // keep the local preview; user can retry by removing and re-adding if needed
+      } finally {
+        setUploadingCount((c) => Math.max(0, c - 1));
+      }
     }
-    setImages((prev) => [...prev, ...out]);
   };
 
   const addDefect = () => {
@@ -312,28 +327,44 @@ function VisitForm({ open, onClose, project, user }: { open: boolean; onClose: (
     setDefDesc("");
   };
 
-  const submit = (e: React.FormEvent) => {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!signature) {
-      alert("Technician sign-off is required.");
+      setError("Technician sign-off is required.");
       return;
     }
-    addVisit(
-      {
-        projectId: project.id,
-        date,
-        technician,
-        cleaningType,
-        weather,
-        preObservation: pre,
-        postObservation: post,
-        images,
-        defects,
-        signature,
-      },
-      user
-    );
-    onClose();
+    if (uploadingCount > 0) {
+      setError("Please wait for image uploads to finish.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await addVisit(
+        {
+          projectId: project.id,
+          date,
+          technician,
+          cleaningType,
+          weather,
+          preObservation: pre,
+          postObservation: post,
+          images,
+          defects,
+          signature,
+        },
+        user
+      );
+      onClose();
+    } catch (err) {
+      console.error("Visit save failed:", err);
+      setError(err instanceof Error ? err.message : "Could not save visit.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -402,9 +433,17 @@ function VisitForm({ open, onClose, project, user }: { open: boolean; onClose: (
           <Input required value={signature} onChange={(e) => setSignature(e.target.value)} placeholder="Full name acts as digital signature" />
         </Field>
 
+        {error && (
+          <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
+
         <div className="flex gap-2 pt-2">
-          <Button type="submit" className="flex-1">Submit Visit</Button>
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button type="submit" className="flex-1" disabled={saving || uploadingCount > 0}>
+            {saving ? "Saving..." : uploadingCount > 0 ? "Uploading images..." : "Submit Visit"}
+          </Button>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
         </div>
       </form>
     </Modal>

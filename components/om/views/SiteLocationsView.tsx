@@ -82,12 +82,47 @@ type LayerEntry = {
   visible: boolean;
 };
 
+type OrthomosaicOverlay = {
+  /** Path (or URL) to the orthomosaic raster image. */
+  url: string;
+  /**
+   * Image corners in [lng, lat] order, matching MapLibre image-source convention:
+   * top-left, top-right, bottom-right, bottom-left.
+   */
+  coordinates: [
+    [number, number],
+    [number, number],
+    [number, number],
+    [number, number]
+  ];
+};
+
 type SiteBoundary = {
   id: string;
   name: string;
   match: string[];
   color: string;
   coordinates: [number, number][];
+  /** Optional georeferenced drone orthomosaic draped over the boundary. */
+  orthomosaic?: OrthomosaicOverlay;
+};
+
+/**
+ * Orthomosaics keyed by boundary id. Declared separately so the SITE_BOUNDARIES
+ * list stays focused on geometry while raster assets live next to the public files.
+ */
+const ORTHOMOSAICS: Partial<Record<string, OrthomosaicOverlay>> = {
+  "ahte-office": {
+    url: "/AHTE-site.png",
+    // Corners derived from the AHTE boundary polygon (slightly inset so the
+    // outline still draws on top of the drape). Order: TL, TR, BR, BL.
+    coordinates: [
+      [74.2359, 31.42211],
+      [74.23612, 31.42211],
+      [74.23612, 31.42199],
+      [74.2359, 31.42199],
+    ],
+  },
 };
 
 const SITE_BOUNDARIES: SiteBoundary[] = [
@@ -116,6 +151,7 @@ const SITE_BOUNDARIES: SiteBoundary[] = [
       [74.236128, 31.4221212],
       [74.2358897, 31.4221032],
     ],
+    orthomosaic: ORTHOMOSAICS["ahte-office"],
   },
 ];
 
@@ -222,10 +258,12 @@ export default function SiteLocationsView({
   user,
   store,
   embedded = false,
+  focusProjectId,
 }: {
   user: User;
   store: Store;
   embedded?: boolean;
+  focusProjectId?: string;
 }) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -235,13 +273,21 @@ export default function SiteLocationsView({
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [visibleProjectIds, setVisibleProjectIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  const [panelCollapsed, setPanelCollapsed] = useState(embedded);
+  const [panelCollapsed, setPanelCollapsed] = useState(embedded || Boolean(focusProjectId));
   const [globeEnabled, setGlobeEnabled] = useState(true);
+
+  useEffect(() => {
+    if (focusProjectId) setPanelCollapsed(true);
+  }, [focusProjectId]);
   const [fullWindow, setFullWindow] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const mapConfig = useMemo(() => getOmMapConfig(), []);
-  const projects = useMemo(() => visibleProjects(user), [user, store]);
+  const projects = useMemo(() => {
+    const base = visibleProjects(user);
+    if (!focusProjectId) return base;
+    return base.filter((p) => p.id === focusProjectId);
+  }, [user, store, focusProjectId]);
   const projectKey = useMemo(() => projects.map((project) => project.id).join("|"), [projects]);
   const totalCapacity = projects.reduce((sum, project) => sum + project.sizeKWp, 0);
   const totalPanels = projects.reduce((sum, project) => sum + project.panelCount, 0);
@@ -494,16 +540,19 @@ export default function SiteLocationsView({
       const marker = markerRefs.current[projectId];
       const boundaryLayerId = `site-boundary-${sourceSafeId(projectId)}`;
       const boundaryOutlineId = `site-boundary-outline-${sourceSafeId(projectId)}`;
+      const orthomosaicLayerId = `site-orthomosaic-${sourceSafeId(projectId)}`;
       if (next.has(projectId)) {
         next.delete(projectId);
         if (marker) marker.getElement().style.display = "none";
         if (mapRef.current?.getLayer(boundaryLayerId)) mapRef.current.setLayoutProperty(boundaryLayerId, "visibility", "none");
         if (mapRef.current?.getLayer(boundaryOutlineId)) mapRef.current.setLayoutProperty(boundaryOutlineId, "visibility", "none");
+        if (mapRef.current?.getLayer(orthomosaicLayerId)) mapRef.current.setLayoutProperty(orthomosaicLayerId, "visibility", "none");
       } else {
         next.add(projectId);
         if (marker) marker.getElement().style.display = "block";
         if (mapRef.current?.getLayer(boundaryLayerId)) mapRef.current.setLayoutProperty(boundaryLayerId, "visibility", "visible");
         if (mapRef.current?.getLayer(boundaryOutlineId)) mapRef.current.setLayoutProperty(boundaryOutlineId, "visibility", "visible");
+        if (mapRef.current?.getLayer(orthomosaicLayerId)) mapRef.current.setLayoutProperty(orthomosaicLayerId, "visibility", "visible");
       }
       return next;
     });
@@ -539,6 +588,19 @@ export default function SiteLocationsView({
         const clientName = clientById.get(project.clientId) ?? "Client site";
         const boundary = getBoundaryForProject(project, clientName);
         const markerCoordinate = getProjectCenter(project, clientName);
+        const hasOrtho = !!boundary?.orthomosaic;
+        const suppressVectorBoundary = hasOrtho && !!focusProjectId;
+        const hideProjectLabel = hasOrtho && !!focusProjectId;
+
+        let labelCoordinate = markerCoordinate;
+        if (hasOrtho && boundary?.orthomosaic) {
+          // Offset the label position north of the orthomosaic rectangle so the project name
+          // pill never overlaps the actual AHTE-site photo content.
+          const ocoords = boundary.orthomosaic.coordinates;
+          const topLat = Math.max(ocoords[0][1], ocoords[1][1]);
+          const midLng = (ocoords[0][0] + ocoords[1][0]) / 2;
+          labelCoordinate = [midLng, topLat + 0.00007];
+        }
 
         if (boundary) {
           const safeProjectId = sourceSafeId(project.id);
@@ -561,64 +623,140 @@ export default function SiteLocationsView({
             });
           }
 
-          if (!map.getLayer(fillLayerId)) {
-            map.addLayer({
-              id: fillLayerId,
-              type: "fill",
-              source: sourceId,
-              paint: {
-                "fill-color": boundary.color,
-                "fill-opacity": 0.3,
-              },
-            });
+          if (!suppressVectorBoundary) {
+            if (!map.getLayer(fillLayerId)) {
+              map.addLayer({
+                id: fillLayerId,
+                type: "fill",
+                source: sourceId,
+                paint: {
+                  "fill-color": boundary.color,
+                  "fill-opacity": 0.3,
+                },
+              });
+            }
           }
 
-          if (!map.getLayer(outlineLayerId)) {
-            map.addLayer({
-              id: outlineLayerId,
-              type: "line",
-              source: sourceId,
-              paint: {
-                "line-color": boundary.color,
-                "line-width": 4,
-                "line-opacity": 0.95,
-              },
-            });
+          // Georeferenced drone orthomosaic draped over the site boundary.
+          // Added as an image source so it warps to the real-world footprint.
+          // In project-specific ortho view we show the image clean (no vector box on top of it).
+          if (boundary.orthomosaic) {
+            const overlaySourceId = `site-orthomosaic-source-${safeProjectId}`;
+            const overlayLayerId = `site-orthomosaic-${safeProjectId}`;
+            if (!map.getSource(overlaySourceId)) {
+              map.addSource(overlaySourceId, {
+                type: "image",
+                url: boundary.orthomosaic.url,
+                coordinates: boundary.orthomosaic.coordinates,
+              });
+            }
+            if (!map.getLayer(overlayLayerId)) {
+              if (!suppressVectorBoundary && map.getLayer(outlineLayerId)) {
+                // Insert below outline only when outline will exist (multi-site view)
+                map.addLayer(
+                  {
+                    id: overlayLayerId,
+                    type: "raster",
+                    source: overlaySourceId,
+                    paint: {
+                      "raster-opacity": 1,
+                      "raster-fade-duration": 0,
+                    },
+                  },
+                  outlineLayerId
+                );
+              } else {
+                map.addLayer({
+                  id: overlayLayerId,
+                  type: "raster",
+                  source: overlaySourceId,
+                  paint: {
+                    "raster-opacity": 1,
+                    "raster-fade-duration": 0,
+                  },
+                });
+              }
+            }
+          }
+
+          if (!suppressVectorBoundary) {
+            if (!map.getLayer(outlineLayerId)) {
+              map.addLayer({
+                id: outlineLayerId,
+                type: "line",
+                source: sourceId,
+                paint: {
+                  "line-color": boundary.color,
+                  "line-width": 4,
+                  "line-opacity": 0.95,
+                },
+              });
+            }
           }
         }
 
-        const el = document.createElement("button");
-        el.type = "button";
-        el.className = `om-site-label${project.status === "Under Maintenance" ? " is-maintenance" : ""}`;
-        el.innerHTML = `<span>${escapeHtml(project.name)}</span>`;
-        el.addEventListener("click", () => focusProject(project));
+        if (!hideProjectLabel) {
+          const el = document.createElement("button");
+          el.type = "button";
+          el.className = `om-site-label${project.status === "Under Maintenance" ? " is-maintenance" : ""}`;
+          el.innerHTML = `<span>${escapeHtml(project.name)}</span>`;
+          el.addEventListener("click", () => focusProject(project));
 
-        const popup = new maplibregl.Popup({
-          closeButton: true,
-          closeOnMove: false,
-          maxWidth: "320px",
-          className: "om-site-popup",
-        }).setHTML(`
-          <div>
-            <h3>${escapeHtml(project.name)}</h3>
-            <p><strong>Client:</strong> ${escapeHtml(clientName)}</p>
-            <p><strong>Location:</strong> ${escapeHtml(project.address)}</p>
-            ${boundary ? `<p><strong>Boundary:</strong> ${escapeHtml(boundary.name)}</p>` : ""}
-            <p><strong>Capacity:</strong> ${project.sizeKWp.toLocaleString()} kWp</p>
-            <p><strong>Panels:</strong> ${project.panelCount.toLocaleString()}</p>
-            <p><strong>Status:</strong> ${escapeHtml(project.status)}</p>
-          </div>
-        `);
+          const popup = new maplibregl.Popup({
+            closeButton: true,
+            closeOnMove: false,
+            maxWidth: "320px",
+            className: "om-site-popup",
+          }).setHTML(`
+            <div>
+              <h3>${escapeHtml(project.name)}</h3>
+              <p><strong>Client:</strong> ${escapeHtml(clientName)}</p>
+              <p><strong>Location:</strong> ${escapeHtml(project.address)}</p>
+              ${boundary ? `<p><strong>Boundary:</strong> ${escapeHtml(boundary.name)}</p>` : ""}
+              <p><strong>Capacity:</strong> ${project.sizeKWp.toLocaleString()} kWp</p>
+              <p><strong>Panels:</strong> ${project.panelCount.toLocaleString()}</p>
+              <p><strong>Status:</strong> ${escapeHtml(project.status)}</p>
+            </div>
+          `);
 
-        markerRefs.current[project.id] = new maplibregl.Marker({ element: el, anchor: "center" })
-          .setLngLat(markerCoordinate)
-          .setPopup(popup)
-          .addTo(map);
+          markerRefs.current[project.id] = new maplibregl.Marker({ element: el, anchor: "center" })
+            .setLngLat(labelCoordinate)
+            .setPopup(popup)
+            .addTo(map);
+        }
       });
 
       window.clearTimeout(loadingFallback);
       setLoading(false);
-      if (embedded) {
+
+      if (focusProjectId && projects[0]) {
+        // Project-specific view: focus directly on the site so the orthomosaic image is immediately visible (no vector boundary box or name label on top of the image)
+        const proj = projects[0];
+        setActiveProjectId(proj.id);
+        try {
+          map.setProjection({ type: "mercator" });
+        } catch {}
+        const b = getBoundaryForProject(proj, clientById.get(proj.clientId));
+        if (b) {
+          map.fitBounds(getBoundaryBounds(b), {
+            padding: { top: 28, right: 28, bottom: 52, left: 28 },
+            maxZoom: mapConfig.maxSiteZoom,
+            pitch: SITE_CAMERA.pitch,
+            bearing: SITE_CAMERA.bearing,
+            duration: 620,
+            essential: true,
+          });
+        } else {
+          map.flyTo({
+            center: [proj.lng, proj.lat],
+            zoom: 16.2,
+            pitch: 52,
+            bearing: -18,
+            duration: 620,
+            essential: true,
+          });
+        }
+      } else if (embedded) {
         focusGlobeView(900);
       } else {
         runIntroTour();
@@ -637,7 +775,7 @@ export default function SiteLocationsView({
       map.remove();
       mapRef.current = null;
     };
-  }, [clientById, embedded, focusAllSites, focusGlobeView, focusProject, mapConfig, projects, runIntroTour]);
+  }, [clientById, embedded, focusAllSites, focusGlobeView, focusProject, focusProjectId, mapConfig, projects, runIntroTour]);
 
   useEffect(() => {
     mapRef.current?.resize();

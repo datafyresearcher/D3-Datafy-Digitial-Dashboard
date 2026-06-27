@@ -267,7 +267,7 @@ async function hasSupabaseSession(): Promise<boolean> {
 }
 
 async function staffApiWrite(
-  path: "/api/om/clients" | "/api/om/projects" | "/api/om/inspections" | "/api/om/docs",
+  path: "/api/om/clients" | "/api/om/projects" | "/api/om/inspections" | "/api/om/docs" | "/api/om/visits",
   method: "POST" | "PATCH",
   body: Record<string, unknown>
 ): Promise<any> {
@@ -1004,40 +1004,43 @@ export async function deleteProject(id: string, user: User) {
 /* =================== Module 3: Visits + defects ==================== */
 
 export async function addVisit(input: Omit<MaintenanceVisit, "id" | "createdAt">, user: User) {
-  const { data, error } = await supabase
-    .from("visits")
-    .insert({
-      project_id: input.projectId,
-      date: input.date,
-      technician: input.technician,
-      cleaning_type: input.cleaningType,
-      weather: input.weather,
-      pre_observation: input.preObservation,
-      post_observation: input.postObservation,
-      images: input.images,
-      signature: input.signature,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  // insert nested defects
-  if (input.defects.length) {
-    await supabase.from("defects").insert(
-      input.defects.map((d) => ({
-        visit_id: data.id,
-        category: d.category,
-        description: d.description,
-        status: d.status,
-        opened_at: d.openedAt,
-        resolved_at: d.resolvedAt ?? null,
-      }))
-    );
+  const row = {
+    project_id: input.projectId,
+    date: input.date,
+    technician: input.technician,
+    cleaning_type: input.cleaningType,
+    weather: input.weather,
+    pre_observation: input.preObservation ?? "",
+    post_observation: input.postObservation ?? "",
+    images: input.images ?? [],
+    signature: input.signature ?? "",
+    defects: input.defects.map((d) => ({
+      id: d.id,
+      category: d.category,
+      description: d.description ?? "",
+      status: d.status ?? "Open",
+      opened_at: d.openedAt ?? nowISO(),
+      resolved_at: d.resolvedAt ?? null,
+    })),
+  };
+
+  let saved: { id: string; created_at: string };
+  if (isSupabaseConfigured()) {
+    const payload = (await staffApiWrite("/api/om/visits", "POST", row)) as {
+      visit?: { id: string; created_at: string };
+    } | null;
+    if (!payload?.visit) throw new Error("Visit was not saved.");
+    saved = payload.visit;
+  } else {
+    saved = { id: uid("vis"), created_at: nowISO() };
   }
+
   await mutate((s) => {
-    s.visits.push({ ...input, id: data.id, createdAt: data.created_at });
+    s.visits = s.visits.filter((v) => v.id !== saved.id);
+    s.visits.push({ ...input, id: saved.id, createdAt: saved.created_at });
     s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "create", target: `Visit ${input.date} (${input.projectId})` });
-  });
-  return getStore().visits.find((v) => v.id === data.id)!;
+  }, true, { syncAfter: false });
+  return getStore().visits.find((v) => v.id === saved.id)!;
 }
 
 export async function updateVisit(id: string, patch: Partial<MaintenanceVisit>) {
@@ -1050,11 +1053,14 @@ export async function updateVisit(id: string, patch: Partial<MaintenanceVisit>) 
   if (patch.postObservation !== undefined) row.post_observation = patch.postObservation;
   if (patch.images !== undefined) row.images = patch.images;
   if (patch.signature !== undefined) row.signature = patch.signature;
-  await supabase.from("visits").update(row).eq("id", id);
+
+  if (isSupabaseConfigured() && Object.keys(row).length > 0) {
+    await staffApiWrite("/api/om/visits", "PATCH", { id, ...row });
+  }
   await mutate((s) => {
     const v = s.visits.find((x) => x.id === id);
     if (v) Object.assign(v, patch);
-  });
+  }, true, { syncAfter: false });
 }
 
 export function visitsFor(projectId: string): MaintenanceVisit[] {
@@ -1068,10 +1074,14 @@ export async function toggleDefect(visitId: string, defectId: string, user: User
   const defect = visit?.defects.find((d) => d.id === defectId);
   if (!defect) return;
   const newStatus = defect.status === "Open" ? "Resolved" : "Open";
-  await supabase
-    .from("defects")
-    .update({ status: newStatus, resolved_at: newStatus === "Resolved" ? nowISO() : null })
-    .eq("id", defectId);
+  const resolvedAt = newStatus === "Resolved" ? nowISO() : null;
+
+  if (isSupabaseConfigured()) {
+    await staffApiWrite("/api/om/visits", "PATCH", {
+      id: visitId,
+      defect: { id: defectId, status: newStatus, resolved_at: resolvedAt },
+    });
+  }
   await mutate((s) => {
     const v = s.visits.find((x) => x.id === visitId);
     const d = v?.defects.find((x) => x.id === defectId);
@@ -1080,7 +1090,7 @@ export async function toggleDefect(visitId: string, defectId: string, user: User
       d.resolvedAt = newStatus === "Resolved" ? nowISO() : undefined;
     }
     s.audit.unshift({ id: uid(), ts: nowISO(), userId: user.id, userName: user.name, action: "edit", target: `Defect ${defectId}` });
-  });
+  }, true, { syncAfter: false });
 }
 
 export function maintenanceStatus(project: Project): {

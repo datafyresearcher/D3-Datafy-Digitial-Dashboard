@@ -44,6 +44,20 @@ export function seedStore(uid: (prefix?: string) => string): Store {
           { id: uid(), ts: "2026-06-21T13:20:00Z", type: "login", detail: "Logged in" },
         ],
       },
+      {
+        id: "c-ahte",
+        company: "AL-Hussain Traders & Engineers PVT. LTD.",
+        contactName: "Amjad Raza",
+        email: "ops@ahte.pk",
+        phone: "+92 300 9068752",
+        billingTier: "Pro",
+        status: "Active",
+        createdAt: "2024-05-01T00:00:00Z",
+        activity: [
+          { id: uid(), ts: "2026-06-25T09:10:00Z", type: "login", detail: "Logged in" },
+          { id: uid(), ts: "2026-06-27T08:05:00Z", type: "view", detail: "Viewed site overview" },
+        ],
+      },
     ],
     projects: [
       {
@@ -128,6 +142,32 @@ export function seedStore(uid: (prefix?: string) => string): Store {
         clientNotes: "Inverter firmware upgrade underway for Block A.",
         maintenanceSchedule: ["Monthly", "Half-yearly"],
       },
+      {
+        id: "p-ahte-1",
+        clientId: "c-ahte",
+        name: "AL-Hussain Traders & Engineers PVT. LTD Rooftop Solar Installation",
+        address: "AL-Hussain Site, Lahore",
+        lat: 31.4220,
+        lng: 74.2360,
+        sizeKWp: 22,
+        panelCount: 36,
+        inverterBrand: "GoodWe",
+        inverterModel: "4526637896",
+        hasBattery: false,
+        gridType: "Hybrid",
+        installedAt: "2024-06-20",
+        warrantyExpiry: "2029-06-20",
+        siteContactName: "Amjad Raza",
+        siteContactPhone: "+92 300 9068752",
+        classification: "Commercial",
+        status: "Active",
+        stringZones: [],
+        gallery: [
+          { id: uid("img"), url: "/AHTE-site.png", caption: "Rooftop orthomosaic", uploadedAt: "2026-06-20T00:00:00Z" },
+        ],
+        clientNotes: "22 kWp hybrid rooftop. Monthly O&M visits.",
+        maintenanceSchedule: ["Monthly"],
+      },
     ],
     visits: [
       {
@@ -152,6 +192,20 @@ export function seedStore(uid: (prefix?: string) => string): Store {
         ],
         signature: "Shahzad Hassan",
         createdAt: "2026-05-12T08:00:00Z",
+      },
+      {
+        id: uid("v"),
+        projectId: "p-ahte-1",
+        date: "2026-06-27",
+        technician: "Usman Tariq",
+        cleaningType: "Dry cleaning",
+        weather: "Sunny",
+        preObservation: "Light dust, panels performing at 100%.",
+        postObservation: "Site clean. All strings nominal. Orthomosaic capture verified.",
+        images: [],
+        defects: [],
+        signature: "Usman Tariq",
+        createdAt: "2026-06-27T07:30:00Z",
       },
     ],
     inspections: [
@@ -227,6 +281,7 @@ function seedPerformance(uid: (prefix?: string) => string): PerformanceRecord[] 
     { id: "p-nestle-1", kwp: 450, psh: 4.6 },
     { id: "p-jzs-1", kwp: 20, psh: 4.7 },
     { id: "p-qa-1", kwp: 100000, psh: 4.8 },
+    { id: "p-ahte-1", kwp: 22, psh: 4.7 },
   ];
   const today = new Date("2026-06-20T00:00:00Z");
   for (const p of projects) {

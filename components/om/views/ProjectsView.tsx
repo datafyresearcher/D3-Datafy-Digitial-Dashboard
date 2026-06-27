@@ -13,6 +13,7 @@ import {
   Trash2,
   BatteryCharging,
   Zap,
+  Globe,
 } from "lucide-react";
 import type { User } from "@/lib/auth";
 import {
@@ -47,6 +48,7 @@ import {
   EmptyState,
   compressImageFile,
 } from "../ui";
+import SiteLocationsView from "./SiteLocationsView";
 
 const CLASSES: ProjectClassification[] = ["Residential", "Commercial", "Industrial"];
 const STATUSES: ProjectStatus[] = ["Active", "Under Maintenance", "Decommissioned"];
@@ -256,6 +258,15 @@ export function ProjectOverview({
             ⚠ Maintenance overdue — last visit {ms.daysSince > 9000 ? "never" : `${ms.daysSince} days ago`} (due every {ms.dueDays}d).
           </div>
         )}
+
+        <Section icon={Globe} title="Site Orthomosaic — Geospatial Map">
+          <div className="-mx-1 rounded-xl overflow-hidden border border-om/70">
+            <SiteLocationsView user={user} store={store} embedded focusProjectId={project.id} />
+          </div>
+          <p className="mt-2 text-[11px] text-om-faint">
+            Orthomosaic (AHTE-site.png) georeferenced precisely to this project&apos;s GPS coordinates. All map controls (layer visibility, globe view, north reset, replay tour, full-window) are fully functional.
+          </p>
+        </Section>
 
         <Section icon={Network} title="String & Zone Mapping">
           {project.stringZones.length === 0 ? (

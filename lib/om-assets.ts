@@ -7,7 +7,8 @@ type UploadKind =
   | "report"
   | "layout"
   | "processed"
-  | "document";
+  | "document"
+  | "visit";
 
 export async function uploadOmAsset(file: File, projectId: string, kind: UploadKind): Promise<string> {
   const res = await fetch("/api/om/assets/sign-upload", {
